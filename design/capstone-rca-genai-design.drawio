@@ -1,0 +1,70 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0" version="26.2.10">
+  <diagram name="Root Cause Analysis" id="log-root-cause-flow">
+    <mxGraphModel dx="950" dy="619" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="Store logs in S3 (openstacklog/raw)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;" parent="1" vertex="1">
+          <mxGeometry x="240" y="110" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Fetch raw data from S3 using Airflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;" parent="1" vertex="1">
+          <mxGeometry x="240" y="190" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Analyze data (Missing data, Outliers) via Airflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;" parent="1" vertex="1">
+          <mxGeometry x="240" y="270" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Validate data using Great Expectations (Airflow)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;" parent="1" vertex="1">
+          <mxGeometry x="240" y="360" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&amp;nbsp;Transform &amp;amp; process data (Imputer, Encoder) ➜ Save to S3/transformed-data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;" parent="1" vertex="1">
+          <mxGeometry x="240" y="440" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Tokenize &amp;amp; embed transformed logs (for LogBERT)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="240" y="540" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Trigger Airflow workflow to feed data to LogBERT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;" parent="1" vertex="1">
+          <mxGeometry x="240" y="620" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="&amp;nbsp;Generate log anomalies using LogBERT model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;" parent="1" vertex="1">
+          <mxGeometry x="240" y="700" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="(Optional) Store anomaly report or trigger alert" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;" parent="1" vertex="1">
+          <mxGeometry x="240" y="780" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="endArrow=block;html=1;" parent="1" source="2" target="3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="endArrow=block;html=1;" parent="1" source="3" target="4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="endArrow=block;html=1;" parent="1" source="4" target="5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="endArrow=block;html=1;" parent="1" source="5" target="6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="endArrow=block;html=1;" parent="1" source="6" target="7" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="endArrow=block;html=1;" parent="1" source="7" target="8" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="endArrow=block;html=1;" parent="1" source="8" target="9" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="endArrow=block;html=1;" parent="1" source="9" target="10" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uPUSgnIk5_BVq6u-cnYK-10" value="Start&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_1;whiteSpace=wrap;points=[[0,0.5,0,0,0],[0.145,0.145,0,0,0],[0.145,0.855,0,0,0],[0.5,0,0,0,0],[0.5,1,0,0,0],[0.855,0.145,0,0,0],[0.855,0.855,0,0,0],[1,0.5,0,0,0]];" vertex="1" parent="1">
+          <mxGeometry x="330" y="20" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="uPUSgnIk5_BVq6u-cnYK-11" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="uPUSgnIk5_BVq6u-cnYK-10">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="360" y="120" as="sourcePoint" />
+            <mxPoint x="380" y="110" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
