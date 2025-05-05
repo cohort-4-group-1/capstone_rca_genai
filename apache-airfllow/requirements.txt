@@ -1,6 +1,6 @@
 boto3
 pandas
-great_expectations
+great_expectations>=0.18.0
 scikit-learn
 matplotlib
 seaborn
