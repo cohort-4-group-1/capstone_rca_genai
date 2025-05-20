@@ -8,7 +8,7 @@ provider "aws" {
 
 terraform {
  backend "s3" {
-    bucket         = "iisc_capstone_rca_tfstate" 
+    bucket         = "iisc-capstone-rca-tfstate" 
     key            = "terraform.tfstate"     
     region          = "us-east-1"  
     encrypt        = true
