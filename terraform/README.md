@@ -44,7 +44,7 @@ install_clearml    = false
 install_prometheus = true
 install_grafana    = false
 install_dask       = false
-insatll_mlflow     = false
+install_mlflow     = false
 ```
 
 This determines whether the module for that service is applied.
