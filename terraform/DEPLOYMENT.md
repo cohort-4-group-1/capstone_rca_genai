@@ -35,7 +35,7 @@ This script:
 ### Step 2: Deploy the MLOps platform
 
 ```bash
-# Initialize Terraform ./terrraform
+# Initialize Terraform ./terraform
 terraform init
 
 # Apply the Terraform configuration ./terraform
