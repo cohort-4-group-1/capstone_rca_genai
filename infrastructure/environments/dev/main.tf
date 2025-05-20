@@ -1,8 +1,7 @@
 # Terraform configuration to set up VPC + EKS (converted from CloudFormation and extended with EKS resources)
 
 provider "aws" {
-  region = var.aws_region
-   profile = "default"
+   region = var.aws_region
 }
 
 
