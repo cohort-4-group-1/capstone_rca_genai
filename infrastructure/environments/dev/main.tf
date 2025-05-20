@@ -7,15 +7,15 @@ provider "aws" {
 
 
 
-#terraform {
-#  backend "s3" {
-#    bucket         = "iisc_capstone_rca_tfstate" 
-#    key            = "terraform.tfstate"     
-#   region         = "us-east-1" 
-#    profile        = "default"     
-#    encrypt        = true
-#  }
-#}
+terraform {
+ backend "s3" {
+   bucket         = "iisc_capstone_rca_tfstate" 
+   key            = "terraform.tfstate"     
+  region          = "us-east-1" 
+   profile        = "default"     
+   encrypt        = true
+ }
+}
 #-------------------------------------------------------------
 # VPC
 #-------------------------------------------------------------
