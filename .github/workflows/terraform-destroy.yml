@@ -1,0 +1,169 @@
+name: 'Terraform Destroy'
+
+on:
+  # Manual trigger only by default - destroying infrastructure is dangerous!
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy (dev, staging, prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirmation:
+        description: 'Type "DESTROY" to confirm you want to destroy resources'
+        required: true
+        type: string
+
+# Allow workflow to access GitHub token for commenting on issues
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # AWS Configuration
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  # Terraform backend configuration
+  TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+  TF_BACKEND_KEY: "env/${{ github.event.inputs.environment }}/terraform.tfstate"
+  TF_BACKEND_REGION: ${{ secrets.AWS_REGION }}
+  
+  # Set Terraform working directory for environment-specific code
+  TF_WORKING_DIR: './infrastructure/environments/${{ github.event.inputs.environment }}'
+  # Set Terraform version
+  TF_VERSION: '1.5.7'
+  
+  # Environment for tagging/filtering
+  ENVIRONMENT: ${{ github.event.inputs.environment }}
+
+jobs:
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    # Safety checks to prevent accidental destroys
+    if: |
+      github.event.inputs.confirmation == 'DESTROY' &&
+      (github.event.inputs.environment == 'dev' || 
+       (github.event.inputs.environment == 'staging' && github.actor == 'admin-user') ||
+       (github.event.inputs.environment == 'prod' && contains(github.actor, 'admin')))
+    
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # Install the Terraform CLI
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    # Configure AWS credentials
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    # Initialize Terraform
+    - name: Terraform Init
+      id: init
+      run: |
+        terraform init \
+          -backend-config="bucket=${TF_BACKEND_BUCKET}" \
+          -backend-config="key=${TF_BACKEND_KEY}" \
+          -backend-config="region=${TF_BACKEND_REGION}"
+          
+    # Create a destroy plan for review
+    - name: Terraform Plan Destroy
+      id: plan
+      run: terraform plan -destroy -out=tfdestroyplan
+      
+    # Show the destroy plan details
+    - name: Show Destroy Plan
+      run: terraform show -no-color tfdestroyplan
+      
+    # Add additional safety check - 30 second countdown
+    - name: Safety Countdown
+      run: |
+        echo "⚠️ DESTROYING ${{ github.event.inputs.environment }} ENVIRONMENT IN 30 SECONDS ⚠️"
+        echo "Press Ctrl+C to abort"
+        for i in {30..1}; do
+          echo "$i..."
+          sleep 1
+        done
+        echo "Proceeding with destroy..."
+      
+    # Execute the destroy operation
+    - name: Terraform Destroy
+      id: destroy
+      run: terraform apply -auto-approve tfdestroyplan
+      
+    # Create a GitHub issue if destroy fails
+    - name: Create Issue on Failure
+      if: failure() && steps.destroy.outcome == 'failure'
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '⚠️ Failed to destroy ${{ github.event.inputs.environment }} environment',
+            body: `
+            # Terraform Destroy Failure
+            
+            Environment: **${{ github.event.inputs.environment }}**
+            Triggered by: @${{ github.actor }}
+            Workflow run: [View Run Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ## Next Steps
+            
+            1. Check the workflow logs for detailed error messages
+            2. Some resources may need to be manually cleaned up
+            3. Fix any issues and re-run the destroy workflow
+            
+            cc: @infrastructure-team
+            `
+          })
+          
+    # Notify about successful destroy
+    - name: Create Success Issue
+      if: success() && steps.destroy.outcome == 'success'
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '✅ Successfully destroyed ${{ github.event.inputs.environment }} environment',
+            body: `
+            # Terraform Destroy Success
+            
+            Environment: **${{ github.event.inputs.environment }}**
+            Triggered by: @${{ github.actor }}
+            Workflow run: [View Run Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            All resources in this environment have been destroyed.
+            `
+          })
+          
+    # Clean up AWS session (security best practice)
+    - name: Cleanup AWS Session
+      if: always()
+      run: |
+        # Clear AWS credentials from environment
+        unset AWS_ACCESS_KEY_ID
+        unset AWS_SECRET_ACCESS_KEY
+        unset AWS_SESSION_TOKEN
