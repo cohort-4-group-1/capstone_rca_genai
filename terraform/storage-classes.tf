@@ -5,11 +5,11 @@ locals {
 }
 
 # Define a Kubernetes Storage Class for EBS
-resource "kubernetes_storage_class" "ebs_gp2" {
+resource "kubernetes_storage_class" "ebs_gp3" {
   count = local.create_storage_classes ? 1 : 0
 
   metadata {
-    name = "ebs-gp2"
+    name = "ebs-gp3"
     annotations = {
       "storageclass.kubernetes.io/is-default-class" = "true"
     }
@@ -19,7 +19,7 @@ resource "kubernetes_storage_class" "ebs_gp2" {
   reclaim_policy      = "Delete"
   volume_binding_mode = "WaitForFirstConsumer"
   parameters = {
-    type      = "gp2"
+    type      = "gp3"
     fsType    = "ext4"
     encrypted = "true"
   }
