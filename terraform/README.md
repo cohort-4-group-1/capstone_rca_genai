@@ -1,6 +1,6 @@
 # 🚀 Terraform Helm Deployment for Kubernetes (Minikube & EKS)
 
-This repository provides a modular and configurable Terraform setup to deploy multiple services (Airflow, ClearML, Prometheus, Grafana, Dask) using Helm charts on Kubernetes clusters. It supports both **Minikube (for local testing)** and **AWS EKS (for cloud deployment)**.
+This repository provides a modular and configurable Terraform setup to deploy multiple MLOps services (Airflow, ClearML, Prometheus, Grafana, Dask, MLflow) using Helm charts on Kubernetes clusters. It supports both **Minikube (for local testing)** and **AWS EKS (for cloud deployment)**, with feature flags for each component.
 
 ---
 
@@ -11,12 +11,39 @@ terraform/
 ├── main.tf                # Root Terraform configuration calling modules
 ├── variables.tf           # Feature flags and configurable inputs
 ├── terraform.tfvars       # Control which services to install (toggle true/false)
+├── eks.tf                 # EKS cluster configuration (conditional)
+├── vpc.tf                 # VPC setup for EKS (conditional)
+├── storage-classes.tf     # Storage classes for EKS
+├── providers.tf           # Provider config for EKS/Minikube
+├── providers-minikube.tf  # Mock AWS provider for Minikube
+├── scripts/               # Helper scripts for setup/testing
+│   ├── minikube-setup.sh
+│   ├── eks-setup.sh
+│   ├── run-terraform-minikube.sh
+│   └── test-deployment.sh
 ├── values/                # Custom Helm values per service
 │   ├── airflow-values.yaml
 │   ├── clearml-values.yaml
-│   └── ...
+│   ├── dask-values.yaml
+│   ├── grafana-values.yaml
+│   ├── mlflow-values.yaml
+│   └── prometheus-values.yaml
 └── modules/helm_release/  # Reusable module to deploy Helm charts
     └── main.tf            # Defines the helm_release resource
+
+.github/
+└── workflows/
+    ├── terraform-aws.yml      # CI/CD for EKS
+    └── terraform-destroy.yml  # Safe destroy workflow
+
+infrastructure/
+├── cloudformation/            # (Optional) CloudFormation templates
+├── environments/              # (Optional) Per-env Terraform
+└── helm-chart/                # (Optional) Custom Helm charts
+
+code/
+└── poc/                       # Example ML code, DAGs, etc.
+datasets/                      # Example datasets
 ```
 
 ---
@@ -47,7 +74,13 @@ install_dask       = false
 install_mlflow     = false
 ```
 
-This determines whether the module for that service is applied.
+This determines whether the module for that service is applied. You can also toggle EKS/Minikube with:
+
+```hcl
+use_eks = true   # Deploy to EKS
+# or
+use_eks = false  # Deploy to Minikube
+```
 
 ---
 
@@ -62,6 +95,8 @@ minikube start --cpus=4 --memory=8192
 ### 2. Run Terraform
 
 ```bash
+cd terraform
+../terraform/scripts/minikube-setup.sh   # (optional: helper for local env)
 terraform init
 terraform plan -var-file="terraform.tfvars"
 terraform apply -var-file="terraform.tfvars"
@@ -94,9 +129,18 @@ kubectl get nodes
 ### 3. Deploy with Terraform
 
 ```bash
+cd terraform
 terraform init
 terraform apply -var-file="terraform.tfvars"
 ```
+
+---
+
+## 🤖 CI/CD Automation
+
+- **GitHub Actions**: Automated workflows for deploy/destroy in `.github/workflows/`.
+- **terraform-aws.yml**: Deploys to EKS on push to `main`.
+- **terraform-destroy.yml**: Manual, with safety checks for environment and confirmation.
 
 ---
 
@@ -149,6 +193,8 @@ kubectl delete namespace airflow
 * Pin Helm chart versions via `chart_version = "x.y.z"` in each module block
 * Use separate namespaces per environment to avoid conflicts
 * Use `wait = false` in Helm for services like Airflow to avoid readiness timeouts
+* Use the helper scripts in `terraform/scripts/` for setup and testing
+* For EKS, ensure your AWS credentials and S3 backend are configured for state
 
 ---
 
