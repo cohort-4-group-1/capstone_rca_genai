@@ -28,3 +28,8 @@ eksctl delete cluster --name airflow-eks --region us-east-1
 aws eks --region us-east-1 update-kubeconfig --name apache-airflow-eks
 
 helm install airflow bitnami/airflow --namespace  airflow -f ./values.yaml
+
+
+## Changelog
+
+5.21.2025: Updated the access keys for Terraform setup.
