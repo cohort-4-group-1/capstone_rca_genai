@@ -32,7 +32,7 @@ env:
   TF_BACKEND_REGION: ${{ secrets.AWS_REGION }}
   
   # Set Terraform working directory for environment-specific code
-  TF_WORKING_DIR: './infrastructure/environments/${{ github.event.inputs.environment }}'
+  TF_WORKING_DIR: './terraform'
   # Set Terraform version
   TF_VERSION: '1.12.0'
   
@@ -87,7 +87,7 @@ jobs:
     # Create a destroy plan for review
     - name: Terraform Plan Destroy
       id: plan
-      run: terraform plan -destroy -out=tfdestroyplan
+      run: terraform plan -destroy -var="use_eks=true" -out=tfdestroyplan
       
     # Show the destroy plan details
     - name: Show Destroy Plan

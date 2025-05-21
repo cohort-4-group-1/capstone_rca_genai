@@ -10,7 +10,7 @@ install_clearml    = false # this would not be installed
 use_eks            = false  // Set to true for EKS, false for Minikube
 
 // AWS/EKS Configuration
-aws_region         = "ap-south-1"
+aws_region         = "us-east-1"
 eks_cluster_name   = "mlops-platform"
 eks_cluster_version = "1.29"
 eks_instance_types = ["t3.medium"]
