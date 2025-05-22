@@ -53,3 +53,48 @@ variable "tfstate_bucket" {
   type        = string
   default = "iisc_capstone_rca_tfstate"
 }
+
+
+variable "use_eks" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = "true"
+}
+
+variable "install_airflow" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = false
+}
+
+variable "install_prometheus" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = false
+}
+
+variable "install_grafana" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = false
+}
+
+variable "install_dask" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = false
+}
+
+variable "install_mlflow" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = true
+}
+
+variable "install_clearml" {
+  description = "EKS will be used or not"
+  type        = bool
+  default = true
+}
+
+
