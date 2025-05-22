@@ -14,10 +14,10 @@ terraform {
 
   # Uncomment if you're storing state remotely
   backend "s3" {
-    bucket         = "your-terraform-state-bucket"
+    bucket         = "rca-tfstate-dev"
     key            = "terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "terraform-lock"
+    #dynamodb_table = "terraform-lock"
   }
 }
 

@@ -30,7 +30,7 @@ if [ ! -f "terraform.tfstate" ]; then
 fi
 
 # Extract EKS cluster information
-CLUSTER_NAME=$(terraform output -raw eks_cluster_id 2>/dev/null)
+CLUSTER_NAME=$(terraform output -raw eks_cl `uster_id 2>/dev/null)
 AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || echo "us-east-1")
 
 if [ -z "$CLUSTER_NAME" ]; then
