@@ -222,3 +222,120 @@ resource "aws_eks_node_group" "default" {
 }
 
 
+#-------------------------------------------------------------
+# Ensure Kubernetes availability before running Helm charts
+#-------------------------------------------------------------
+resource "null_resource" "wait_for_cluster" {
+  depends_on = [aws_eks_node_group.default]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for EKS cluster to be fully available..."
+      aws eks --region ${var.aws_region} update-kubeconfig --name ${aws_eks_cluster.main.name}
+      
+      # Wait for nodes to be ready
+      echo "Waiting for EKS nodes to be ready..."
+      kubectl wait --for=condition=ready nodes --all --timeout=600s
+
+      echo "EKS cluster is now ready for deployments"
+    EOT
+  }
+}
+
+#-------------------------------------------------------------
+#Cluster Services
+#-------------------------------------------------------------
+module "airflow" {
+  source           = "./modules/helm_release"
+  count            = var.install_airflow ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on       = [null_resource.wait_for_cluster]
+
+  enabled          = true
+  name             = "airflow"
+  namespace        = "airflow"
+  chart            = "airflow"
+  repo             = "https://airflow.apache.org"
+  values_files     = ["${path.module}/values/airflow-values.yaml"]
+  chart_version    = "1.16.0"
+}
+module "clearml" {
+  source       = "./modules/helm_release"
+  count        = var.install_clearml ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "clearml"
+  namespace    = "clearml"
+  chart        = "clearml"
+  repo         = "https://clearml.github.io/clearml-helm-charts"
+  values_files = ["${path.module}/values/clearml-values.yaml"]
+  chart_version = "7.14.4"
+}
+
+module "prometheus" {
+  source       = "./modules/helm_release"
+  count        = var.install_prometheus ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "prometheus"
+  namespace    = "monitoring"
+  chart        = "prometheus"
+  repo         = "https://prometheus-community.github.io/helm-charts"
+  values_files = ["${path.module}/values/prometheus-values.yaml"]
+  chart_version = "25.18.0"
+}
+
+module "grafana" {
+  source       = "./modules/helm_release"
+  count        = var.install_grafana ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "grafana"
+  namespace    = "monitoring"
+  chart        = "grafana"
+  repo         = "https://grafana.github.io/helm-charts"
+  values_files = ["${path.module}/values/grafana-values.yaml"]
+  chart_version = "7.3.0"
+}
+
+module "dask" {
+  source       = "./modules/helm_release"
+  count        = var.install_dask ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "dask"
+  namespace    = "dask"
+  chart        = "dask"
+  repo         = "https://helm.dask.org"
+  values_files = ["${path.module}/values/dask-values.yaml"]
+  chart_version = "2024.1.1"
+}
+
+module "mlflow" {
+  source         = "./modules/helm_release"
+  count          = var.install_mlflow ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on     = [null_resource.wait_for_cluster]
+
+  enabled        = true
+  name           = "mlflow"
+  namespace      = "mlflow"
+  chart          = "mlflow"
+  repo           = "https://community-charts.github.io/helm-charts"
+  chart_version  = "0.7.3"
+  values_files   = ["${path.module}/values/mlflow-values.yaml"]
+}
