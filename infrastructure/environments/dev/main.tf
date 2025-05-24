@@ -165,6 +165,49 @@ resource "aws_iam_role" "eks_node_group" {
   })
 }
 
+resource "aws_iam_role_policy_attachment" "eks_ebs_csi_driver" {
+  role       = aws_iam_role.eks_node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+
+
+resource "kubernetes_storage_class" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner    = "ebs.csi.aws.com"
+  reclaim_policy         = "Delete"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+}
+
+
+resource "helm_release" "ebs_csi_driver" {
+  name       = "aws-ebs-csi-driver"
+  namespace  = "kube-system"
+  repository = "https://kubernetes-sigs.github.io/aws-ebs-csi-driver"
+  chart      = "aws-ebs-csi-driver"
+  version    = "2.30.0" # Use latest compatible version
+
+  set {
+    name  = "controller.serviceAccount.create"
+    value = true
+  }
+
+  set {
+    name  = "controller.serviceAccount.name"
+    value = "ebs-csi-controller-sa"
+  }
+
+  depends_on = [null_resource.wait_for_cluster]
+}
+
+
 resource "aws_iam_role_policy_attachment" "eks_worker_node" {
   role       = aws_iam_role.eks_node_group.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
