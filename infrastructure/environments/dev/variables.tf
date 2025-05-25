@@ -92,3 +92,9 @@ variable "install_mlflow" {
   default     = true
   description = "Whether to install MLflow"
 }
+
+variable "install_postgres" {
+  description = "Whether to install PostgreSQL"
+  type        = bool
+  default     = true
+}

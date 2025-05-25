@@ -170,6 +170,44 @@ resource "aws_iam_role_policy_attachment" "eks_ebs_csi_driver" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
+#-------------------------------------------------------------
+# IAM role for EBS CSI driver service account (IRSA)
+#-------------------------------------------------------------
+data "tls_certificate" "oidc_thumbprint" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.oidc_thumbprint.certificates[0].sha1_fingerprint]
+}
+
+resource "aws_iam_role" "ebs_csi_sa" {
+  name = "${var.name_prefix}-ebs-csi-sa-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+        StringEquals = {
+          "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_sa" {
+  role       = aws_iam_role.ebs_csi_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
 
 
 resource "kubernetes_storage_class" "gp3" {
@@ -184,6 +222,11 @@ resource "kubernetes_storage_class" "gp3" {
   reclaim_policy         = "Delete"
   volume_binding_mode    = "WaitForFirstConsumer"
   allow_volume_expansion = true
+
+  depends_on = [
+    null_resource.wait_for_cluster,
+    helm_release.ebs_csi_driver
+  ]
 }
 
 
@@ -204,7 +247,14 @@ resource "helm_release" "ebs_csi_driver" {
     value = "ebs-csi-controller-sa"
   }
 
-  depends_on = [null_resource.wait_for_cluster]
+  set {
+    name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.ebs_csi_sa.arn
+  }
+  depends_on = [
+    null_resource.wait_for_cluster,
+    aws_iam_role_policy_attachment.ebs_csi_sa
+  ]
 }
 
 
@@ -381,4 +431,26 @@ module "mlflow" {
   repo           = "https://community-charts.github.io/helm-charts"
   chart_version  = "0.7.3"
   values_files   = ["${path.module}/values/mlflow-values.yaml"]
+}
+
+#-------------------------------------------------------------
+# PostgreSQL Database
+#-------------------------------------------------------------
+module "postgresql" {
+  source       = "./modules/helm_release"
+  count        = 1  # Always install PostgreSQL
+  
+  # Add explicit dependency on cluster readiness and EBS CSI driver for volume provisioning
+  depends_on   = [
+    null_resource.wait_for_cluster,
+    helm_release.ebs_csi_driver
+  ]
+
+  enabled      = true
+  name         = "postgresql"
+  namespace    = "database"
+  chart        = "postgresql"
+  repo         = "https://charts.bitnami.com/bitnami"
+  values_files = ["${path.module}/values/postgresql-values.yaml"]
+  chart_version = "15.0.0"  # Use a specific version for stability
 }
