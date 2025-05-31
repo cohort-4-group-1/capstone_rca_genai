@@ -53,3 +53,48 @@ variable "tfstate_bucket" {
   type        = string
   default = "iisc_capstone_rca_tfstate"
 }
+
+#--------------------------------------------------------------
+# Application Installation Flags
+#--------------------------------------------------------------
+variable "install_airflow" {
+  type        = bool
+  default     = true
+  description = "Whether to install Apache Airflow"
+}
+
+variable "install_clearml" {
+  type        = bool
+  default     = true
+  description = "Whether to install ClearML"
+}
+
+variable "install_prometheus" {
+  type        = bool
+  default     = true
+  description = "Whether to install Prometheus"
+}
+
+variable "install_grafana" {
+  type        = bool
+  default     = true
+  description = "Whether to install Grafana"
+}
+
+variable "install_dask" {
+  type        = bool
+  default     = true
+  description = "Whether to install Dask"
+}
+
+variable "install_mlflow" {
+  type        = bool
+  default     = true
+  description = "Whether to install MLflow"
+}
+
+variable "install_postgres" {
+  description = "Whether to install PostgreSQL"
+  type        = bool
+  default     = true
+}

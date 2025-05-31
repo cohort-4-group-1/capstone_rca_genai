@@ -165,6 +165,102 @@ resource "aws_iam_role" "eks_node_group" {
   })
 }
 
+resource "aws_iam_role_policy_attachment" "eks_ebs_csi_driver" {
+  role       = aws_iam_role.eks_node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+#-------------------------------------------------------------
+# IAM role for EBS CSI driver service account (IRSA)
+#-------------------------------------------------------------
+data "tls_certificate" "oidc_thumbprint" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.oidc_thumbprint.certificates[0].sha1_fingerprint]
+}
+
+resource "aws_iam_role" "ebs_csi_sa" {
+  name = "${var.name_prefix}-ebs-csi-sa-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_sa" {
+  role       = aws_iam_role.ebs_csi_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+
+
+resource "kubernetes_storage_class" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner    = "ebs.csi.aws.com"
+  reclaim_policy         = "Delete"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+
+  depends_on = [
+    null_resource.wait_for_cluster,
+    helm_release.ebs_csi_driver
+  ]
+}
+
+
+resource "helm_release" "ebs_csi_driver" {
+  name       = "aws-ebs-csi-driver"
+  namespace  = "kube-system"
+  repository = "https://kubernetes-sigs.github.io/aws-ebs-csi-driver"
+  chart      = "aws-ebs-csi-driver"
+  version    = "2.30.0" # Use latest compatible version
+
+  set {
+    name  = "controller.serviceAccount.create"
+    value = true
+  }
+
+  set {
+    name  = "controller.serviceAccount.name"
+    value = "ebs-csi-controller-sa"
+  }
+
+  # Add this line to use the IRSA role
+ set_sensitive {
+  name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+  value = aws_iam_role.ebs_csi_sa.arn
+}
+
+  depends_on = [
+    null_resource.wait_for_cluster,
+    aws_iam_role_policy_attachment.ebs_csi_sa
+  ]
+}
+
+
 resource "aws_iam_role_policy_attachment" "eks_worker_node" {
   role       = aws_iam_role.eks_node_group.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
@@ -212,7 +308,7 @@ resource "aws_eks_node_group" "default" {
     max_size     = 3
     min_size     = 1
   }
-  instance_types = ["t3.medium"]
+  instance_types = ["m5.xlarge"]
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node,
@@ -222,3 +318,120 @@ resource "aws_eks_node_group" "default" {
 }
 
 
+#-------------------------------------------------------------
+# Ensure Kubernetes availability before running Helm charts
+#-------------------------------------------------------------
+resource "null_resource" "wait_for_cluster" {
+  depends_on = [aws_eks_node_group.default]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for EKS cluster to be fully available..."
+      aws eks --region ${var.aws_region} update-kubeconfig --name ${aws_eks_cluster.main.name}
+      
+      # Wait for nodes to be ready
+      echo "Waiting for EKS nodes to be ready..."
+      kubectl wait --for=condition=ready nodes --all --timeout=600s
+
+      echo "EKS cluster is now ready for deployments"
+    EOT
+  }
+}
+
+#-------------------------------------------------------------
+#Cluster Services
+#-------------------------------------------------------------
+module "airflow" {
+  source           = "./modules/helm_release"
+  count            = var.install_airflow ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on       = [null_resource.wait_for_cluster]
+
+  enabled          = true
+  name             = "airflow"
+  namespace        = "airflow"
+  chart            = "airflow"
+  repo             = "https://airflow.apache.org"
+  values_files     = ["${path.module}/values/airflow-values.yaml"]
+  chart_version    = "1.16.0"
+}
+module "clearml" {
+  source       = "./modules/helm_release"
+  count        = var.install_clearml ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "clearml"
+  namespace    = "clearml"
+  chart        = "clearml"
+  repo         = "https://clearml.github.io/clearml-helm-charts"
+  values_files = ["${path.module}/values/clearml-values.yaml"]
+  chart_version = "7.14.4"
+}
+
+module "prometheus" {
+  source       = "./modules/helm_release"
+  count        = var.install_prometheus ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "prometheus"
+  namespace    = "monitoring"
+  chart        = "prometheus"
+  repo         = "https://prometheus-community.github.io/helm-charts"
+  values_files = ["${path.module}/values/prometheus-values.yaml"]
+  chart_version = "25.18.0"
+}
+
+module "grafana" {
+  source       = "./modules/helm_release"
+  count        = var.install_grafana ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "grafana"
+  namespace    = "monitoring"
+  chart        = "grafana"
+  repo         = "https://grafana.github.io/helm-charts"
+  values_files = ["${path.module}/values/grafana-values.yaml"]
+  chart_version = "7.3.0"
+}
+
+module "dask" {
+  source       = "./modules/helm_release"
+  count        = var.install_dask ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "dask"
+  namespace    = "dask"
+  chart        = "dask"
+  repo         = "https://helm.dask.org"
+  values_files = ["${path.module}/values/dask-values.yaml"]
+  chart_version = "2024.1.1"
+}
+
+module "mlflow" {
+  source         = "./modules/helm_release"
+  count          = var.install_mlflow ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on     = [null_resource.wait_for_cluster]
+
+  enabled        = true
+  name           = "mlflow"
+  namespace      = "mlflow"
+  chart          = "mlflow"
+  repo           = "https://community-charts.github.io/helm-charts"
+  chart_version  = "0.7.3"
+  values_files   = ["${path.module}/values/mlflow-values.yaml"]
+}
