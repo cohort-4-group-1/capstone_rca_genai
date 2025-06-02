@@ -5,7 +5,6 @@ import pandas as pd
 import boto3
 
 from io import BytesIO
-from sklearn.impute import SimpleImputer
 
 
 # S3 config
