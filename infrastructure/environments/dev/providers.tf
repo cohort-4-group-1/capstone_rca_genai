@@ -1,14 +1,25 @@
+# Provider configuration for Kubernetes and Helm to connect to EKS cluster
 
-# Terraform requires AWS provider configuration, so we set it up with
-# dummy values when not using EKS. This avoids credential errors.
-
-# The actual AWS provider is now in providers-minikube.tf for local development
-# and this file is only used for EKS deployments when use_eks = true
-
-# Helm provider with conditional config
-provider "helm" {
-  kubernetes {
-    config_path = "~/.kube/config"
+provider "kubernetes" {
+  host                   = aws_eks_cluster.main.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
+  
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.main.name]
   }
 }
- 
+
+provider "helm" {
+  kubernetes {
+    host                   = aws_eks_cluster.main.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
+    
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.main.name]
+    }
+  }
+}
