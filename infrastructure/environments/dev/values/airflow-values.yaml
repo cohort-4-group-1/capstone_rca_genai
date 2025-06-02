@@ -1,6 +1,6 @@
 airflow:
   extraPipPackages:
-    - -r /opt/airflow/dags/code/requirements.txt
+    - -r /opt/airflow/dags/code/dags/requirements.txt
 dags:
   gitSync:
     enabled: true
@@ -8,3 +8,9 @@ dags:
     branch: sujit-eda         
     subPath: "code/dags"          
     depth: 1 
+web:
+  dagMountPath: /opt/airflow/dags
+
+worker:
+  dagMountPath: /opt/airflow/dags
+

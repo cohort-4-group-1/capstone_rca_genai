@@ -3,7 +3,6 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime
 import pandas as pd
 import boto3
-import great_expectations as gx
 
 from io import BytesIO
 from sklearn.impute import SimpleImputer
