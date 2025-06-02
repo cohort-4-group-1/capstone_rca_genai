@@ -176,14 +176,4 @@ cython_debug/
 .venv*
 
 .terraform*
-terraform.*
-
-/.DS_Store
-
-# Local state files
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
-
-# Terraform working directory
-terraform/.terraform/
-terraform/.terraform.lock.hcl
+# terraform.*
