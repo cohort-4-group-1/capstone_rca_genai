@@ -6,7 +6,6 @@ import boto3
 
 from io import BytesIO
 from sklearn.impute import SimpleImputer
-from great_expectations.core.batch import RuntimeBatchRequest
 
 
 # S3 config
