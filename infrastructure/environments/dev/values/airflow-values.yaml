@@ -1,3 +1,6 @@
+airflow:
+  extraPipPackages:
+    - -r /opt/airflow/dags/code/requirements.txt
 dags:
   gitSync:
     enabled: true
