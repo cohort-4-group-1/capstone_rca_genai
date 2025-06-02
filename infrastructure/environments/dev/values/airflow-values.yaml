@@ -1,7 +1,7 @@
 dags:
   gitSync:
     enabled: true
-    repo: git@github.com:cohort-4-group-1/capstone_rca_genai.git
+    repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
     branch: sujit-eda         
     subPath: "code/dags"          
     depth: 1 
