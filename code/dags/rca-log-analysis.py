@@ -34,8 +34,8 @@ def upload_to_s3(**kwargs):
 
 with DAG(
     dag_id='rca-log-preprocess-pipeline',
-    start_date=datetime(2023, 1, 1),
-    schedule_interval="*/2 * * * *",  # Runs every 2 minutes
+    start_date=datetime(2025, 6, 3),
+    schedule_interval="*/15 * * * *",  # Runs every 2 minutes
     catchup=False,
     tags=['s3', 'validation', 'etl'],
 ) as dag:
