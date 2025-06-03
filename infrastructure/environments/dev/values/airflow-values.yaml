@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 airflow:
   extraPipPackages:
     - -r /opt/airflow/dags/code/dags/requirements.txt
@@ -31,3 +32,23 @@ worker:
     # Annotations to add to worker kubernetes service account.
     annotations:
       eks.amazonaws.com/role-arn: "arn:aws:iam::160224865545:role/iisc-capstone-rca-ebs-csi-sa-role"
+=======
+airflow:
+  extraPipPackages:
+    - -r /opt/airflow/dags/code/dags/requirements.txt
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
+    branch: sujit-eda         
+    subPath: "code/dags"          
+    depth: 1 
+web:
+  dagMountPath: /opt/airflow/dags
+
+worker:
+  dagMountPath: /opt/airflow/dags  
+  create: false  
+  name: airflow-worker
+
+>>>>>>> sujit-eda

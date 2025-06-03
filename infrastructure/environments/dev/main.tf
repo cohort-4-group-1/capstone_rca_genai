@@ -209,6 +209,31 @@ resource "aws_iam_role_policy_attachment" "ebs_csi_sa" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
+resource "aws_iam_role" "airflow_s3_access_sa" {
+  name = "${var.name_prefix}-airflow-s3-access"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:airflow:airflow-worker"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "airflow_s3_access_sa" {
+  role       = aws_iam_role.airflow_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
 
 
 resource "kubernetes_storage_class" "gp3" {
@@ -276,6 +301,13 @@ resource "aws_iam_role_policy_attachment" "eks_registry" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# Add this alongside your other aws_iam_role_policy_attachment resources for the node group
+
+resource "aws_iam_role_policy_attachment" "eks_node_group_s3_access" {
+  role       = aws_iam_role.eks_node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
 #-------------------------------------------------------------
 # EKS Cluster
 #-------------------------------------------------------------
@@ -341,24 +373,44 @@ resource "null_resource" "wait_for_cluster" {
 
 
 
+
+
+
 #-------------------------------------------------------------
 #Cluster Services
 #-------------------------------------------------------------
-module "airflow" {
-  source           = "./modules/helm_release"
-  count            = var.install_airflow ? 1 : 0
-  
-  # Add explicit dependency on cluster readiness
-  depends_on       = [null_resource.wait_for_cluster]
+resource "helm_release" "airflow" {
+  name       = "airflow"
+  namespace  = "airflow"
+  repository = "https://airflow.apache.org"
+  chart      = "airflow"
+  version    = "1.16.0" 
+  count      = var.install_airflow ? 1 : 0
+    
+    
+ values = [
+  file("${path.module}/values/airflow-values.yaml")
+]
+set {
+    name  = "worker.serviceAccount.create"
+    value = true
+  }
 
-  enabled          = true
-  name             = "airflow"
-  namespace        = "airflow"
-  chart            = "airflow"
-  repo             = "https://airflow.apache.org"
-  values_files     = ["${path.module}/values/airflow-values.yaml"]
-  chart_version    = "1.16.0"
+set {
+    name  = "worker.serviceAccount.name"
+    value = "s3_access_sa"
+  }
+set_sensitive {
+    name  = "worker.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.airflow_s3_access_sa.arn 
+  }
+
+  depends_on = [
+    null_resource.wait_for_cluster,
+    aws_iam_role_policy_attachment.airflow_s3_access_sa 
+  ]
 }
+
 module "clearml" {
   source       = "./modules/helm_release"
   count        = var.install_clearml ? 1 : 0
