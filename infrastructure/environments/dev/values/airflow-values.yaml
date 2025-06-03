@@ -12,5 +12,7 @@ web:
   dagMountPath: /opt/airflow/dags
 
 worker:
-  dagMountPath: /opt/airflow/dags
+  dagMountPath: /opt/airflow/dags  
+  create: false  
+  name: airflow-worker
 
