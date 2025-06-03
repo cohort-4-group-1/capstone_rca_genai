@@ -8,7 +8,7 @@ provider "aws" {
 
 terraform {
  backend "s3" {
-    bucket         = "rca-tfstate-dev" 
+    bucket         = "rca-tfstate-dev-ritam" 
     key            = "terraform.tfstate"     
     region          = "us-east-1"  
     encrypt        = true
@@ -337,6 +337,9 @@ resource "null_resource" "wait_for_cluster" {
     EOT
   }
 }
+
+
+
 
 #-------------------------------------------------------------
 #Cluster Services

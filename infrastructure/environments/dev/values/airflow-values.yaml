@@ -1,0 +1,33 @@
+airflow:
+  extraPipPackages:
+    - -r /opt/airflow/dags/code/dags/requirements.txt
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
+    branch: sujit-eda         
+    subPath: "code/dags"          
+    depth: 1 
+web:
+  dagMountPath: /opt/airflow/dags
+  serviceAccount:
+    create: true # Or true if you want the chart to create the SA
+    name: airflow-webserver # The name of your service account
+    # Annotations to add to worker kubernetes service account.
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::160224865545:role/iisc-capstone-rca-ebs-csi-sa-role"
+
+worker:
+  dagMountPath: /opt/airflow/dags  
+  create: false  
+  name: airflow-worker
+  serviceAccount:
+    # Specifies whether a ServiceAccount should be created
+    create: true
+    # The name of the ServiceAccount to use.
+    # If not set and create is true, a name is generated using the release name
+    name: "airflow-worker"
+
+    # Annotations to add to worker kubernetes service account.
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::160224865545:role/iisc-capstone-rca-ebs-csi-sa-role"
