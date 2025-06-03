@@ -8,8 +8,8 @@ from io import BytesIO
 
 
 # S3 config
-SOURCE_BUCKET = 'datasets.mlops'
-DEST_BUCKET = 'datasets.mlops'
+SOURCE_BUCKET = 'datasets.mlops.ritam'
+DEST_BUCKET = 'datasets.mlops.ritam'
 FILE_KEY = 'Raw (Bronze)/OpenStack_2k.log_structured.csv'
 OUTPUT_KEY = 'Cleansed (Silver)/OpenStack_cleaned.csv'
 AWS_REGION = 'us-east-1'
