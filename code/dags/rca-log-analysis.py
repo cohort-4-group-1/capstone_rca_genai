@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime
+from datetime import datetime,timedelta,timezone  
 import pandas as pd
 import boto3
 
@@ -32,9 +32,14 @@ def upload_to_s3(**kwargs):
     s3 = boto3.client('s3', region_name=AWS_REGION)
     s3.put_object(Bucket=DEST_BUCKET, Key=OUTPUT_KEY, Body=cleaned_csv.encode())
 
+# Calculate start_date as 30 minutes from now (UTC)
+now_utc = datetime.now(timezone.utc)
+start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
+
+
 with DAG(
     dag_id='rca-log-preprocess-pipeline',
-    start_date=datetime(2025, 6, 3),
+    start_date=start_date_utc,
     schedule_interval="*/30 * * * *",  # Runs every 2 minutes
     catchup=False,
     tags=['s3', 'validation', 'etl'],
