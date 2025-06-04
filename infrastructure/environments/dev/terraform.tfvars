@@ -1,7 +1,7 @@
 // Application Installation Configuration
 install_airflow    = true
-install_prometheus = true
-install_grafana    = true
-install_dask       = true
-install_mlflow     = true # this would be installed
+install_prometheus = false
+install_grafana    = false
+install_dask       = false
+install_mlflow     = false # this would be installed
 install_clearml    = false # this would not be installed
