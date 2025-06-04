@@ -8,11 +8,31 @@ dags:
     branch: sujit-eda         
     subPath: "code/dags"          
     depth: 1 
-web:
-  dagMountPath: /opt/airflow/dags
 
-worker:
-  dagMountPath: /opt/airflow/dags  
-  create: false  
-  name: airflow-worker
+workers:
+  serviceAccount:      
+      # Specifies whether a ServiceAccount should be created
+      create: true
+      # The name of the ServiceAccount to use.
+      # If not set and create is true, a name is generated using the release name
+      name: airflow-worker-test
 
+      # Annotations to add to worker kubernetes service account.
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::682033474520:role/iisc-capstone-rca-airflow-s3-access  
+webserver:
+  serviceAccount:      
+      # Specifies whether a ServiceAccount should be created
+      create: true
+      # The name of the ServiceAccount to use.
+      # If not set and create is true, a name is generated using the release name
+      name: airflow-webserver-test
+      # Annotations to add to worker kubernetes service account.
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::682033474520:role/iisc-capstone-rca-airflow-web-s3-access         
+scheduler:
+  serviceAccount:
+    create: true
+    name: airflow-scheduler-test
+    annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::682033474520:role/iisc-capstone-rca-airflow-scheduler-s3-access  
