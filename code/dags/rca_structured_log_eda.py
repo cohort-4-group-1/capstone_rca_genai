@@ -1,8 +1,9 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta, timezone
-#from dask.distributed import Client
-#import dask.dataframe as dd
+import matplotlib.pyplot as plt
+from dask.distributed import Client
+import dask.dataframe as dd
 import boto3
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -11,10 +12,10 @@ from io import BytesIO
 import configuration
 
 def perform_dask_eda_and_save_to_s3(**kwargs):
-    #client = Client("tcp://dask-scheduler.dask.svc.cluster.local:8786")
+    client = Client("tcp://dask-scheduler.dask.svc.cluster.local:8786")
 
     s3_path = f"s3://{configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}"
-    df = pd.read_csv(s3_path)
+    df = dd.read_csv(s3_path)
 
     print("✅ Columns:", df.columns)
     
@@ -64,7 +65,7 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
     )
 
     print("✅ EDA summary and plots saved to S3.")
-    #client.close()
+    client.close()
 
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
@@ -74,7 +75,7 @@ start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, m
 with DAG(
     dag_id='rca_structured_log_eda',
     start_date=start_date_utc,
-    schedule_interval="*/30 * * * *",
+    schedule_interval="*/10 * * * *",
     catchup=False,
     tags=['s3', 'validation', 'etl'],
 ) as dag:
