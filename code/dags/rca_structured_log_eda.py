@@ -74,7 +74,7 @@ start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, m
 with DAG(
     dag_id='rca_structured_log_eda',
     start_date=start_date_utc,
-    schedule_interval="*/10 * * * *",
+    schedule_interval="*/30 * * * *",
     catchup=False,
     tags=['s3', 'validation', 'etl'],
 ) as dag:
