@@ -11,12 +11,13 @@ import dask.dataframe as dd
 import matplotlib.pyplot as plt
 
 def perform_dask_eda_and_save_to_s3(**kwargs):
+    print(" Started perform_dask_eda_and_save_to_s3:")
     client = Client("tcp://dask-scheduler.dask.svc.cluster.local:8786")
-
+    print(" Started perform_dask_eda_and_save_to_s3: client is created for dask")
     s3_path = f"s3://{configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}"
     df = dd.read_csv(s3_path)
-
-    print("✅ Columns:", df.columns)
+    print(" Started perform_dask_eda_and_save_to_s3: csv is read")
+    print(" Columns:", df.columns)
     
     # Summary EDA
     summary = {
@@ -25,7 +26,7 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
         "missing_values": df.isnull().sum().compute().to_dict(),
         "row_count": df.shape[0].compute(),
     }
-
+    print(" Started perform_dask_eda_and_save_to_s3: summary")
     # Save EDA summary to CSV
     summary_df = pd.DataFrame.from_dict(summary, orient='index').transpose()
     summary_buffer = BytesIO()
@@ -54,7 +55,7 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
             ContentType='image/png'
         )
         plt.close()
-        print(f"📊 Histogram saved to s3://{plot_bucket}/{file_key}")
+        print(f"Histogram saved to s3://{plot_bucket}/{file_key}")
 
     # Upload summary
     boto3.client("s3").put_object(
@@ -63,7 +64,7 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
         Body=summary_buffer.getvalue()
     )
 
-    print("✅ EDA summary and plots saved to S3.")
+    print("EDA summary and plots saved to S3.")
     client.close()
 
 
