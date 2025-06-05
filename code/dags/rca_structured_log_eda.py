@@ -1,14 +1,14 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta, timezone
-from dask.distributed import Client
-import dask.dataframe as dd
 import boto3
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from io import BytesIO
 import configuration
+from dask.distributed import Client
+import dask.dataframe as dd
 
 def perform_dask_eda_and_save_to_s3(**kwargs):
     client = Client("tcp://dask-scheduler.dask.svc.cluster.local:8786")
