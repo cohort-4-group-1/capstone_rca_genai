@@ -102,7 +102,7 @@ def append_log_key_to_structured_log():
     print("☁️ Uploading enriched structured log with LogKey to S3...")
     csv_buffer = StringIO()
     structured_df.to_csv(csv_buffer, index=False)
-    enriched_key = configuration.STRUCTURED_WITH_LOGKEY_KEY  # define this in configuration.py
+    enriched_key = configuration.STRUCTURED_WITH_LOG_KEY  
 
     s3_client.put_object(
         Bucket=configuration.DEST_BUCKET,
