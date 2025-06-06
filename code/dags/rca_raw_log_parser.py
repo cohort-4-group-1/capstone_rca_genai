@@ -19,7 +19,7 @@ def read_raw_log_from_datalake(**kwargs):
     kwargs['ti'].xcom_push(key='raw_log_text', value=log_text)
 
 def convert_raw_log_to_csv(**kwargs):
-    raw_log = kwargs['ti'].xcom_pull(task_ids='read_raw_log_from_datalake', key='raw_log_text')
+    raw_log = kwargs['ti'].xcom_pull(task_ids='read_log_from_raw_datalake', key='raw_log_text')
     
     pattern = re.compile(
         r'(?P<source>[^\s]+)\s+'
