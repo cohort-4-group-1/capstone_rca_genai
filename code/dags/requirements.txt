@@ -5,3 +5,5 @@ scikit-learn
 matplotlib
 seaborn
 dask[complete]
+s3fs
+drain3

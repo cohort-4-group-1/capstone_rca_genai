@@ -7,7 +7,7 @@ import boto3
 import re
 import configuration  
 
-def read_log_from_raw_datalake(**kwargs):
+def read_raw_log_from_datalake(**kwargs):
     print(f"Reading file from S3: {configuration.SOURCE_BUCKET}/{configuration.RAW_FILE_KEY}")
     s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
     obj = s3.get_object(Bucket=configuration.SOURCE_BUCKET, Key=configuration.RAW_FILE_KEY)
@@ -19,7 +19,7 @@ def read_log_from_raw_datalake(**kwargs):
     kwargs['ti'].xcom_push(key='raw_log_text', value=log_text)
 
 def convert_raw_log_to_csv(**kwargs):
-    raw_log = kwargs['ti'].xcom_pull(task_ids='read_log_from_raw_datalake', key='raw_log_text')
+    raw_log = kwargs['ti'].xcom_pull(task_ids='read_raw_log_from_datalake', key='raw_log_text')
     
     pattern = re.compile(
         r'(?P<source>[^\s]+)\s+'
@@ -71,7 +71,7 @@ with DAG(
 
     t1 = PythonOperator(
         task_id='read_log_from_raw_datalake',
-        python_callable=read_log_from_raw_datalake
+        python_callable=read_raw_log_from_datalake
     )
 
     t2 = PythonOperator(

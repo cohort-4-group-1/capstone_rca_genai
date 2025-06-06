@@ -1,0 +1,116 @@
+import pandas as pd
+import configuration
+from drain3 import TemplateMiner
+from drain3.file_persistence import FilePersistence
+import boto3
+from io import StringIO
+
+
+def read_structured_log_from_datalake():
+    print(" Started read_structured_log_from_datalake:")
+    s3_path = f"s3://{configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}"
+    df = pd.read_csv(s3_path)
+    print(" End read_structured_log_from_datalake: csv is read")
+    print(" Columns:", df.columns)  
+    print(" Sample messages:\n", df['message'].dropna().head(10))
+    return df 
+
+
+def upload_templates_to_s3(df):
+    print("Uploading templates to S3...")
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer, index=False)
+
+    s3_client = boto3.client("s3")
+    s3_client.put_object(
+        Bucket=configuration.DEST_BUCKET,
+        Key=configuration.TEMPLATE_FILE_KEY,
+        Body=csv_buffer.getvalue()
+    )
+    print(f"✅ Uploaded to s3://{configuration.DEST_BUCKET}/{configuration.TEMPLATE_FILE_KEY}")
+
+
+def convert_to_template_from_structured_log():
+    df = read_structured_log_from_datalake()
+    if 'message' not in df.columns:
+        print("Column 'message' not found.")
+        return
+
+    log_messages = df['message'].dropna().tolist()
+    if not log_messages:
+        print("No log messages to process.")
+        return
+
+    persistence = FilePersistence("log_template_state.json")
+    template_miner = TemplateMiner(persistence, config=None)
+
+    templates_set = set()
+    for log_line in log_messages:
+        result = template_miner.add_log_message(log_line)
+        if result["change_type"] != "none":
+            templates_set.add(result["template_mined"])
+    
+    templates_list = [str(template) for template in templates_set]
+
+    templates_df = pd.DataFrame({
+         "LogKey": [f"LG_KEY_{i}" for i in range(1, len(templates_list)+1)],
+        "Template": list(templates_set)
+    })
+
+    templates_df.to_csv("log_templates.csv", index=False)
+    print("Generated templates:")
+    print(templates_df.head())
+    if not templates_df.empty:
+      upload_templates_to_s3(templates_df)
+
+def append_log_key_to_structured_log():
+    print("📥 Reading structured logs and templates from S3...")
+
+    # Read structured logs
+    structured_log_path = f"s3://{configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}"
+    structured_df = pd.read_csv(structured_log_path)
+
+    # Read templates from S3
+    s3_client = boto3.client("s3")
+    template_obj = s3_client.get_object(Bucket=configuration.DEST_BUCKET, Key=configuration.TEMPLATE_FILE_KEY)
+    templates_df = pd.read_csv(template_obj["Body"])
+
+    print("✅ Structured log and templates loaded.")
+    
+    # Create template dictionary: template text -> log key
+    template_dict = dict(zip(templates_df["Template"], templates_df["LogKey"]))
+
+    # Setup Drain3 miner with existing state (no new learning)
+    persistence = FilePersistence("log_template_state.json")  # must be consistent with training
+    template_miner = TemplateMiner(persistence, config=None)
+
+     
+    def match_log_key(message):
+        result = template_miner.match(message)
+        if result:
+            template_str = result.get_template()
+            print(f"🔍 Message: {message}\n↪ Matched Template: {template_str}")
+            if template_str in template_dict:
+                return template_dict[template_str]
+        return "UNMAPPED"
+    
+
+    print("🔎 Matching logs with templates...")
+    structured_df["LogKey"] = structured_df["message"].dropna().apply(match_log_key)
+
+    # Save enriched structured logs to S3
+    print("☁️ Uploading enriched structured log with LogKey to S3...")
+    csv_buffer = StringIO()
+    structured_df.to_csv(csv_buffer, index=False)
+    enriched_key = configuration.STRUCTURED_WITH_LOGKEY_KEY  # define this in configuration.py
+
+    s3_client.put_object(
+        Bucket=configuration.DEST_BUCKET,
+        Key=enriched_key,
+        Body=csv_buffer.getvalue()
+    )
+
+    print(f"✅ Enriched structured log uploaded to s3://{configuration.DEST_BUCKET}/{enriched_key}")
+
+convert_to_template_from_structured_log()
+append_log_key_to_structured_log()
