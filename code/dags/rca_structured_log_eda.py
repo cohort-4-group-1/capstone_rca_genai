@@ -73,7 +73,7 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id='rca_structured_log_eda',
+    dag_id='Step 2 - > rca_structured_log_eda',
     start_date=start_date_utc,
     schedule_interval="*/30 * * * *",
     catchup=False,
