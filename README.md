@@ -25,7 +25,7 @@ eksctl create cluster --name airflow --region us-east-1 --version 1.32   --nodeg
 
 eksctl delete cluster --name airflow-eks --region us-east-1
 
-aws eks --region us-east-1 update-kubeconfig --name apache-airflow-eks
+aws eks --region us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
 
 helm install airflow bitnami/airflow --namespace  airflow -f ./values.yaml
 
@@ -33,3 +33,16 @@ helm install airflow bitnami/airflow --namespace  airflow -f ./values.yaml
 ## Changelog
 
 5.21.2025: Updated the access keys for Terraform setup.
+
+## docker command
+
+docker build -t airflow/airflow-custom:2.10.5 .
+docker tag airflow/airflow-custom:2.10.5 sujittah/airflow-custom:2.10.5
+docker push sujittah/airflow-custom:2.10.5
+
+
+docker build -t dask/dask-custom:2023.12.1 .
+docker tag dask/dask-custom:2023.12.1 sujittah/dask-custom:2023.12.1
+docker push sujittah/dask-custom:2023.12.1
+
+kubectl port-forward pod/airflow-webserver-947874fc5-ng4b9  8080:8080 -n airflow                              
