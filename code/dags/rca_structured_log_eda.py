@@ -19,16 +19,21 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
     print(" Started perform_dask_eda_and_save_to_s3: csv is read")
     print(" Columns:", df.columns)
     
-    # Summary EDA
-    summary = {
-        "columns": df.columns.tolist(),
-        "dtypes": df.dtypes.astype(str).to_dict(),
-        "missing_values": df.isnull().sum().compute().to_dict(),
+    summary_dict = {
+        "columns": ", ".join(df.columns),
         "row_count": df.shape[0].compute(),
     }
-    print(" Started perform_dask_eda_and_save_to_s3: summary")
-    # Save EDA summary to CSV
-    summary_df = pd.DataFrame.from_dict(summary, orient='index').transpose()
+
+    # Flatten dtypes and missing values
+    dtypes = df.dtypes.astype(str).to_dict()
+    missing = df.isnull().sum().compute().to_dict()
+
+    # Combine all into a single flat row
+    for col in df.columns:
+        summary_dict[f"dtype_{col}"] = dtypes.get(col)
+        summary_dict[f"missing_{col}"] = missing.get(col)
+
+    summary_df = pd.DataFrame([summary_dict])
     summary_buffer = BytesIO()
     summary_df.to_csv(summary_buffer, index=False)
 
