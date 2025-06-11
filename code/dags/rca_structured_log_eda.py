@@ -27,7 +27,7 @@ def analyse_request_id_feature(df):
     num_dash = (df["request_id"] == "-").sum()
     analysis_results["request_id_dash_count"] = safe_int(num_dash)
 
-    has_duplicates = bool(df["request_id"].duplicated().any().compute())
+    has_duplicates = bool(df["request_id"].compute().duplicated().any())
     analysis_results["request_id_has_duplicates"] = has_duplicates
 
     print("\nAnalysis for 'request_id' column:")
