@@ -23,5 +23,5 @@ def generate_log_sequence():
 
     csv_buffer = StringIO()
     session_df.to_csv(csv_buffer, index=False)
-    s3.put_object(Bucket=bucket, Key="gold/logbert_template_text_input.csv", Body=csv_buffer.getvalue())
+    s3.put_object(Bucket=bucket, Key=configuration.LOG_SEQUENCE__FILE_KEY, Body=csv_buffer.getvalue())
     print("✅ LogBERT input saved to S3: gold/logbert_template_text_input.csv")

@@ -28,5 +28,4 @@ RUN pip install --no-cache-dir \
     matplotlib \
     seaborn \
     mlflow \
-    tensorflow \
-    sklearn
+    tensorflow 
