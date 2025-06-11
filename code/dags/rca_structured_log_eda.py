@@ -43,7 +43,7 @@ def analyse_feature_datatype_missing_value(df):
 
     summary_dict = {
         "columns": ", ".join(df.columns),
-        "row_count": df.shape[0].compute().item()
+        "row_count": int(df.shape[0].compute())
     }
 
     dtypes = df.dtypes.astype(str).to_dict()
