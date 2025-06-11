@@ -9,6 +9,12 @@ from io import BytesIO
 import configuration
 from dask.distributed import Client
 
+def safe_int(val):
+    try:
+        return int(val.compute())
+    except AttributeError:
+        return int(val)
+
 def analyse_request_id_feature(df):
     analysis_results = {}
 
@@ -16,12 +22,12 @@ def analyse_request_id_feature(df):
     analysis_results["request_id_top_50_value_counts"] = value_counts.to_dict()
 
     num_nulls = df["request_id"].isna().sum()
-    analysis_results["request_id_null_count"] = int(num_nulls)
+    analysis_results["request_id_null_count"] = safe_int(num_nulls)
 
     num_dash = (df["request_id"] == "-").sum()
-    analysis_results["request_id_dash_count"] = int(num_dash)
+    analysis_results["request_id_dash_count"] = safe_int(num_dash)
 
-    has_duplicates = bool(df["request_id"].duplicated().any())
+    has_duplicates = bool(df["request_id"].duplicated().any().compute())
     analysis_results["request_id_has_duplicates"] = has_duplicates
 
     print("\nAnalysis for 'request_id' column:")
@@ -37,19 +43,13 @@ def analyse_request_id_feature(df):
         Key=f"{configuration.EDA_OUTPUT}/eda_analyse_request_id_feature.csv",
         Body=buffer.getvalue()
     )
-    
-def to_native(val):
-    try:
-        return val.item()  # For Dask/NumPy scalars
-    except AttributeError:
-        return val  # Already a native Python object
 
 def analyse_feature_datatype_missing_value(df):
     print(" Columns:", df.columns)
 
     summary_dict = {
         "columns": ", ".join(df.columns),
-        "row_count": to_native(df.shape[0].compute()),  # ✅ FIXED
+        "row_count": safe_int(df.shape[0])
     }
 
     dtypes = df.dtypes.astype(str).to_dict()
@@ -101,7 +101,7 @@ def impute_request_id(df):
 def perform_dask_eda_and_save_to_s3(**kwargs):
     try:
         print("Starting perform_dask_eda_and_save_to_s3:")
-        client = Client("tcp://dask-scheduler.dask.svc.cluster.local:8786")  
+        client = Client("tcp://dask-scheduler.dask.svc.cluster.local:8786")
 
         s3_path = f"s3://{configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}"
         df = dd.read_csv(s3_path)
@@ -114,7 +114,6 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
             analyse_request_id_feature(df)
             df = impute_request_id(df)
 
-            # Save imputed DataFrame back to S3
             imputed_output_path = f"s3://{configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}"
             print(f"Writing imputed DataFrame back to {imputed_output_path}...")
             df.to_csv(imputed_output_path, single_file=True, index=False)
