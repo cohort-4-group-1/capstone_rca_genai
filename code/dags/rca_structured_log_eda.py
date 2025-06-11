@@ -43,7 +43,7 @@ def analyse_feature_datatype_missing_value(df):
 
     summary_dict = {
         "columns": ", ".join(df.columns),
-        "row_count": df.shape[0].compute(),
+        "row_count": df.shape[0].compute().item()
     }
 
     dtypes = df.dtypes.astype(str).to_dict()
@@ -135,4 +135,3 @@ with DAG(
         task_id="perform_dask_eda_and_save_to_s3",
         python_callable=perform_dask_eda_and_save_to_s3
     )
-
