@@ -107,6 +107,10 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
         df = dd.read_csv(s3_path)
         print("CSV file read from S3.")
 
+        # Ensure divisions are known before any partition-based operations
+        if not df.known_divisions:
+            df = df.set_index(df.columns[0], sorted=False, drop=False)
+
         analyse_feature_datatype_missing_value(df)
         analyse_feature_histogram(df)
 
