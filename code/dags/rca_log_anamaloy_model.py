@@ -4,6 +4,11 @@ import pandas as pd
 import mlflow
 import mlflow.tensorflow
 from sklearn.model_selection import train_test_split
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta, timezone
+import os
+import configuration
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
@@ -11,31 +16,7 @@ EPOCHS = 5
 BATCH_SIZE = 16
 MAX_LEN = 128
 LEARNING_RATE = 2e-5
-
-# Load tokenizer and model
-tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
-bert_model = TFBertModel.from_pretrained(MODEL_NAME)
-
-# Load session sequences (no labels needed)
-df = pd.read_csv("logbert_template_text_input.csv")
-sequences = df["sequence"].tolist()
-
-# Tokenize all sequences
-tokens = tokenizer(
-    sequences,
-    max_length=MAX_LEN,
-    padding="max_length",
-    truncation=True,
-    return_tensors="tf"
-)
-
-input_ids = tokens["input_ids"]
-attention_mask = tokens["attention_mask"]
-
-# Split into train/val sets
-train_ids, val_ids, train_mask, val_mask = train_test_split(
-    input_ids, attention_mask, test_size=0.2, random_state=42
-)
+DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 
 # Define decoder model
 class LogBERTAutoencoder(tf.keras.Model):
@@ -53,41 +34,89 @@ class LogBERTAutoencoder(tf.keras.Model):
         reconstructed = self.dense2(encoded)
         return reconstructed
 
-# Instantiate and compile
-model = LogBERTAutoencoder(bert_model)
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
-    loss=tf.keras.losses.MeanSquaredError()
-)
+# Define training function
+def train_logbert_autoencoder():
+    mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
+    mlflow.tensorflow.autolog()
 
-# Define checkpoint callback
-checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-    "logbert_autoencoder_best.h5",
-    save_best_only=True,
-    monitor="val_loss",
-    mode="min",
-    verbose=1
-)
+    # Load tokenizer and model
+    tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
+    bert_model = TFBertModel.from_pretrained(MODEL_NAME)
 
-# Enable MLflow auto-logging
-mlflow.tensorflow.autolog()
+    # Load session sequences (no labels needed)
+    df = pd.read_csv(DATA_PATH)
+    sequences = df["sequence"].tolist()
 
-# Start MLflow run
-with mlflow.start_run():
-    history = model.fit(
-        x=(train_ids, train_mask),
-        y=model((train_ids, train_mask)),
-        validation_data=((val_ids, val_mask), model((val_ids, val_mask))),
-        batch_size=BATCH_SIZE,
-        epochs=EPOCHS,
-        callbacks=[checkpoint_cb]
+    # Tokenize all sequences
+    tokens = tokenizer(
+        sequences,
+        max_length=MAX_LEN,
+        padding="max_length",
+        truncation=True,
+        return_tensors="tf"
     )
 
-    mlflow.log_param("model_name", MODEL_NAME)
-    mlflow.log_param("epochs", EPOCHS)
-    mlflow.log_param("batch_size", BATCH_SIZE)
-    mlflow.log_param("max_len", MAX_LEN)
-    mlflow.log_param("learning_rate", LEARNING_RATE)
-    mlflow.log_artifact("logbert_autoencoder_best.h5")
+    input_ids = tokens["input_ids"]
+    attention_mask = tokens["attention_mask"]
 
-print("✅ Unsupervised training complete. Best model saved and tracked in MLflow.")
+    # Split into train/val sets
+    train_ids, val_ids, train_mask, val_mask = train_test_split(
+        input_ids, attention_mask, test_size=0.2, random_state=42
+    )
+
+    # Instantiate and compile
+    model = LogBERTAutoencoder(bert_model)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss=tf.keras.losses.MeanSquaredError()
+    )
+
+    # Define checkpoint callback
+    checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+        "logbert_autoencoder_best.h5",
+        save_best_only=True,
+        monitor="val_loss",
+        mode="min",
+        verbose=1
+    )
+
+    # Start MLflow run
+    with mlflow.start_run():
+        history = model.fit(
+            x=(train_ids, train_mask),
+            y=model((train_ids, train_mask)),
+            validation_data=((val_ids, val_mask), model((val_ids, val_mask))),
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            callbacks=[checkpoint_cb]
+        )
+
+        mlflow.log_param("model_name", MODEL_NAME)
+        mlflow.log_param("epochs", EPOCHS)
+        mlflow.log_param("batch_size", BATCH_SIZE)
+        mlflow.log_param("max_len", MAX_LEN)
+        mlflow.log_param("learning_rate", LEARNING_RATE)
+        mlflow.log_artifact("logbert_autoencoder_best.h5")
+
+    print("✅ Unsupervised training complete. Best model saved and tracked in MLflow.")
+
+# DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
+now_utc = datetime.now(timezone.utc)
+start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
+
+
+with DAG(
+    dag_id='logbert_unsupervised_train_dag',
+    start_date=start_date_utc,
+    schedule_interval="@daily",
+    catchup=False,
+    tags=['logbert', 'mlflow', 'tensorflow']
+) as dag:
+    training_task = PythonOperator(
+        task_id="train_logbert_autoencoder",
+        python_callable=train_logbert_autoencoder
+    )
+
+    
+
+

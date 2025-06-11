@@ -389,8 +389,8 @@ resource "kubernetes_service_account" "dask_access" {
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.dask_s3_access_sa.arn
     }
-    depends_on = [kubernetes_namespace.dask]
   }
+  depends_on = [kubernetes_namespace.dask]
 }
 
 resource "aws_iam_role_policy_attachment" "dask_s3_access_sa" {
@@ -537,7 +537,7 @@ module "dask" {
   name         = "dask"
   namespace    = "dask"
   chart        = "dask"
-  repo         = "https ://helm.dask.org"
+  repo         = "https://helm.dask.org"
   values_files = ["${path.module}/values/dask-values.yaml"]
   chart_version = "2024.1.1"
 }
