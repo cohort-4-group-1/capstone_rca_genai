@@ -30,7 +30,7 @@ def upload_templates_to_s3(df):
     print(f"✅ Uploaded to s3://{configuration.DEST_BUCKET}/{configuration.TEMPLATE_FILE_KEY}")
 
 
-def convert_to_template_from_structured_log():
+def convert_template_from_structured_log():
     df = read_structured_log_from_datalake()
     if 'message' not in df.columns:
         print("Column 'message' not found.")
@@ -112,5 +112,5 @@ def append_log_key_to_structured_log():
 
     print(f"✅ Enriched structured log uploaded to s3://{configuration.DEST_BUCKET}/{enriched_key}")
 
-convert_to_template_from_structured_log()
+convert_template_from_structured_log()
 append_log_key_to_structured_log()

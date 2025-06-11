@@ -26,4 +26,7 @@ RUN pip install --no-cache-dir \
     "great_expectations>=1.4.2" \
     scikit-learn \
     matplotlib \
-    seaborn
+    seaborn \
+    mlflow \
+    tensorflow \
+    sklearn
