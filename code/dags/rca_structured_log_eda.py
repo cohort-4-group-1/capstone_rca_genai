@@ -37,13 +37,19 @@ def analyse_request_id_feature(df):
         Key=f"{configuration.EDA_OUTPUT}/eda_analyse_request_id_feature.csv",
         Body=buffer.getvalue()
     )
+    
+def to_native(val):
+    try:
+        return val.item()  # For Dask/NumPy scalars
+    except AttributeError:
+        return val  # Already a native Python object
 
 def analyse_feature_datatype_missing_value(df):
     print(" Columns:", df.columns)
 
     summary_dict = {
         "columns": ", ".join(df.columns),
-        "row_count": int(df.shape[0].compute())
+        "row_count": to_native(df.shape[0].compute()),  # ✅ FIXED
     }
 
     dtypes = df.dtypes.astype(str).to_dict()
