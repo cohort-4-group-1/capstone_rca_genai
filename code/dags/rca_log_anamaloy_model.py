@@ -9,6 +9,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta, timezone
 import os
 import configuration
+import numpy as np
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
@@ -58,10 +59,12 @@ def train_logbert_autoencoder():
 
     input_ids = tokens["input_ids"]
     attention_mask = tokens["attention_mask"]
-
+    
+    input_ids_np = input_ids.numpy()
+    attention_mask_np = attention_mask.numpy()
     # Split into train/val sets
     train_ids, val_ids, train_mask, val_mask = train_test_split(
-        input_ids, attention_mask, test_size=0.2, random_state=42
+        input_ids_np, attention_mask_np, test_size=0.2, random_state=42
     )
 
     # Instantiate and compile
@@ -79,7 +82,10 @@ def train_logbert_autoencoder():
         mode="min",
         verbose=1
     )
-
+    train_ids = tf.convert_to_tensor(train_ids)
+    train_mask = tf.convert_to_tensor(train_mask)
+    val_ids = tf.convert_to_tensor(val_ids)
+    val_mask = tf.convert_to_tensor(val_mask)
     # Start MLflow run
     with mlflow.start_run():
         history = model.fit(
