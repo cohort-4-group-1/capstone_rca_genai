@@ -12,5 +12,3 @@ EDA_OUTPUT = 'logs/eda_output'
 
 AWS_REGION = 'us-east-1'
 
-aws s3api create-bucket --bucket rca.logs.openstack --profile capstone --region us-east-1
-
