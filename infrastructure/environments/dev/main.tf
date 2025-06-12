@@ -1,7 +1,7 @@
 # Terraform configuration to set up VPC + EKS (converted from CloudFormation and extended with EKS resources)
 
 provider "aws" {
-   region = var.aws_region
+   region = var.aws_region   
 }
 
 
@@ -276,6 +276,128 @@ resource "aws_iam_role_policy_attachment" "eks_registry" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role" "airflow_s3_access_sa" {
+  name = "${var.name_prefix}-airflow-s3-access"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:airflow:airflow-worker-test"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "airflow_s3_access_sa" {
+  role       = aws_iam_role.airflow_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+resource "aws_iam_role" "airflow_web_s3_access_sa" {
+  name = "${var.name_prefix}-airflow-web-s3-access"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:airflow:airflow-webserver-test"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "airflow_web_s3_access_sa" {
+  role       = aws_iam_role.airflow_web_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+resource "aws_iam_role" "airflow_scheduler_s3_access_sa" {
+  name = "${var.name_prefix}-airflow-scheduler-s3-access"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:airflow:airflow-scheduler-test"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "airflow_scheduler_s3_access_sa" {
+  role       = aws_iam_role.airflow_scheduler_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+
+resource "aws_iam_role" "dask_s3_access_sa" {
+  name = "${var.name_prefix}-dask-s3-access"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:dask:dask-access"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+resource "kubernetes_namespace" "dask" {
+  metadata {
+    name = "dask"
+  }
+}
+
+# Kubernetes ServiceAccount with annotation
+resource "kubernetes_service_account" "dask_access" {
+  metadata {
+    name      = "dask-access"
+    namespace = "dask"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.dask_s3_access_sa.arn
+    }
+  }
+  depends_on = [kubernetes_namespace.dask]
+}
+
+resource "aws_iam_role_policy_attachment" "dask_s3_access_sa" {
+  role       = aws_iam_role.dask_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
 #-------------------------------------------------------------
 # EKS Cluster
 #-------------------------------------------------------------
@@ -346,7 +468,7 @@ module "airflow" {
   count            = var.install_airflow ? 1 : 0
   
   # Add explicit dependency on cluster readiness
-  depends_on       = [null_resource.wait_for_cluster]
+  depends_on       = [aws_iam_role_policy_attachment.airflow_s3_access_sa,null_resource.wait_for_cluster]
 
   enabled          = true
   name             = "airflow"
@@ -409,7 +531,7 @@ module "dask" {
   count        = var.install_dask ? 1 : 0
   
   # Add explicit dependency on cluster readiness
-  depends_on   = [null_resource.wait_for_cluster]
+  depends_on   = [null_resource.wait_for_cluster,kubernetes_service_account.dask_access]
 
   enabled      = true
   name         = "dask"
