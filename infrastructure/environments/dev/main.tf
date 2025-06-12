@@ -1,14 +1,14 @@
 # Terraform configuration to set up VPC + EKS (converted from CloudFormation and extended with EKS resources)
 
 provider "aws" {
-   region = var.aws_region
+   region = var.aws_region   
 }
 
 
 
 terraform {
  backend "s3" {
-    bucket         = "sujit-terraform-state-bucket" 
+    bucket         = "rca-tfstate-dev" 
     key            = "terraform.tfstate"     
     region          = "us-east-1"  
     encrypt        = true

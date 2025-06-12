@@ -1,5 +1,5 @@
-SOURCE_BUCKET = 'datasets.mlops'
-DEST_BUCKET = 'datasets.mlops'
+SOURCE_BUCKET = 'rca.logs.openstack'
+DEST_BUCKET = 'rca.logs.openstack'
 RAW_FILE_KEY = 'raw/OpenStack_2k.log'
 SILVER_FILE_NAME = 'OpenStack_structured.csv'
 SILVER_FILE_KEY = 'silver/' + SILVER_FILE_NAME
@@ -11,3 +11,6 @@ LOG_SEQUENCE__FILE_KEY='gold/logbert_template_text_input.csv'
 EDA_OUTPUT = 'logs/eda_output'
 
 AWS_REGION = 'us-east-1'
+
+aws s3api create-bucket --bucket rca.logs.openstack --profile capstone --region us-east-1
+

@@ -7,7 +7,7 @@ worker:
     pullPolicy: Always  
   serviceAccountName: dask-access
   serviceAnnotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::682033474520:role/iisc-capstone-rca-dask-s3-access  
+    eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-dask-s3-access  
 
 scheduler:
   name: scheduler
