@@ -25,9 +25,10 @@ HF_TOKEN = "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" #os.getenv("HF_TOKEN")  # Set
 
 # Define training function
 def train_logbert():
+    print("Started train_logbert")
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
     mlflow.tensorflow.autolog()
-
+    print("After mlflow")
     # Load tokenizer and model
     tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
     bert_model = TFBertModel.from_pretrained(MODEL_NAME)
@@ -44,7 +45,7 @@ def train_logbert():
         truncation=True,
         return_tensors="tf"
     )
-
+    print("After token")
     input_ids = tokens["input_ids"]
     attention_mask = tokens["attention_mask"]
 
