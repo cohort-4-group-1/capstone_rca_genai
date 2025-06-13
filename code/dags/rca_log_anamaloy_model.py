@@ -81,10 +81,10 @@ def train_logbert():
         save_best_only=True,
         monitor="val_loss",
         mode="min",
-        verbose=1,
+        verbose=0,
         save_format="tf"
     )
-
+    print("Model Training has been started")
     # Start MLflow run
     with mlflow.start_run():
         history = model.fit(
@@ -97,7 +97,7 @@ def train_logbert():
             batch_size=BATCH_SIZE,
             epochs=EPOCHS,
             callbacks=[checkpoint_cb]
-        )
+        )        
         train_loss = history.history['loss'][-1]
         val_loss = history.history['val_loss'][-1]
 
@@ -110,12 +110,15 @@ def train_logbert():
         mlflow.log_param("learning_rate", LEARNING_RATE)
         mlflow.tensorflow.log_model(model, artifact_path="rca_logbert_model")
 
-
+    print("Model Training is completed")
     # Save full model for Hugging Face
+    print("Model will be saved")
     model.save(HUGGINGFACE_MODEL_DIR, save_format="tf")
 
     # Upload to Hugging Face
+    print("Model will be uploaded")
     if HF_API_TOKEN:
+        print("Model will be uploaded: HF_API_TOKEN is set")
         HfFolder.save_token(HF_API_TOKEN)
         upload_folder(
             folder_path=HUGGINGFACE_MODEL_DIR,
