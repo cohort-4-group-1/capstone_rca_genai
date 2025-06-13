@@ -19,9 +19,9 @@ BATCH_SIZE = 16
 MAX_LEN = 128
 LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
-HUGGINGFACE_MODEL_DIR = "rca_logbert_model"
+HUGGINGFACE_MODEL_DIR = "/opt/airflow/rca_logbert_model"
 HF_REPO_ID = "sujit6779/rca_log"
-HF_TOKEN = "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" #os.getenv("HF_TOKEN")  # Set this in Airflow env
+HF_API_TOKEN = "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" #os.getenv("HF_TOKEN")  # Set this in Airflow env
 
 # Define training function
 def train_logbert():
@@ -115,8 +115,8 @@ def train_logbert():
     model.save(HUGGINGFACE_MODEL_DIR, save_format="tf")
 
     # Upload to Hugging Face
-    if HF_TOKEN:
-        HfFolder.save_token(HF_TOKEN)
+    if HF_API_TOKEN:
+        HfFolder.save_token(HF_API_TOKEN)
         upload_folder(
             folder_path=HUGGINGFACE_MODEL_DIR,
             repo_id=HF_REPO_ID,
@@ -125,7 +125,7 @@ def train_logbert():
         )
         print(f"✅ Model uploaded to https://huggingface.co/{HF_REPO_ID}")
     else:
-        print("⚠️ HF_TOKEN not set. Skipping upload to Hugging Face.")
+        print("⚠️ HF_API_TOKEN not set. Skipping upload to Hugging Face.")
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
 now_utc = datetime.now(timezone.utc)
