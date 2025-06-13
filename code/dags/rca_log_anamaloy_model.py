@@ -14,14 +14,14 @@ from huggingface_hub import HfApi, HfFolder, upload_folder
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
-EPOCHS = 5
+EPOCHS = 1
 BATCH_SIZE = 16
 MAX_LEN = 128
 LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 HUGGINGFACE_MODEL_DIR = "rca_logbert_model"
 HF_REPO_ID = "sujit6779/rca_log"
-HF_TOKEN = os.getenv("HF_TOKEN")  # Set this in Airflow env
+HF_TOKEN = "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" #os.getenv("HF_TOKEN")  # Set this in Airflow env
 
 # Define training function
 def train_logbert():
