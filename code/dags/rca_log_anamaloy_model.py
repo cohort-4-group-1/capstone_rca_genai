@@ -81,7 +81,8 @@ def train_logbert_autoencoder():
         save_best_only=True,
         monitor="val_loss",
         mode="min",
-        verbose=1
+        verbose=1,
+        save_format='tf'
     )
     train_ids = tf.convert_to_tensor(train_ids)
     train_mask = tf.convert_to_tensor(train_mask)
