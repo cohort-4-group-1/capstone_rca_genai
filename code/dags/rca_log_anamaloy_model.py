@@ -76,11 +76,12 @@ def train_logbert_autoencoder():
 
     # Define checkpoint callback
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath = "/opt/airflow/logbert_autoencoder_best.h5",
+        filepath = "/opt/airflow/logbert_autoencoder_best",
         save_best_only=True,
         monitor="val_loss",
         mode="min",
-        verbose=1
+        verbose=1,
+        save_format='tf'
     )
     train_ids = tf.convert_to_tensor(train_ids)
     train_mask = tf.convert_to_tensor(train_mask)
