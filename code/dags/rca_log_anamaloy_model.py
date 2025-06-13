@@ -76,7 +76,7 @@ def train_logbert_autoencoder():
 
     # Define checkpoint callback
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        "logbert_autoencoder_best.h5",
+        filepath = "/opt/airflow/logbert_autoencoder_best.h5",
         save_best_only=True,
         monitor="val_loss",
         mode="min",
