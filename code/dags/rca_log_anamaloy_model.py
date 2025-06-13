@@ -14,8 +14,8 @@ import boto3
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
-EPOCHS = 2
-BATCH_SIZE = 16
+EPOCHS = 1
+BATCH_SIZE = 32
 MAX_LEN = 128
 LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
@@ -103,7 +103,8 @@ def train_logbert_autoencoder():
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_param("max_len", MAX_LEN)
         mlflow.log_param("learning_rate", LEARNING_RATE)
-        mlflow.log_model("logbert_autoencoder", model, registered_model_name="logbert_autoencoder_best")
+        mlflow.keras.log_model(model, "logbert_autoencoder_model")
+        mlflow.log_metric("final_train_loss", history.history["loss"][-1])
 
     print("✅ Unsupervised training complete. Best model saved and tracked in MLflow.")
 
