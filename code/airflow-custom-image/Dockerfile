@@ -15,20 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 USER airflow
 
+COPY requirements.txt .
+
 # Install required Python libraries
-RUN pip install --no-cache-dir \
-    drain3 \
-    boto3 \
-    pandas \
-    "dask[complete]==2023.12.1" \
-    "distributed==2023.12.1" \
-    s3fs \
-    "great_expectations>=1.4.2" \
-    scikit-learn \
-    matplotlib \
-    seaborn \
-    mlflow \
-    tensorflow==2.13.0 \
-    keras==2.13.1 \
-    transformers==4.31.0 \
-    huggingface_hub
+RUN pip install --no-cache-dir -r requirements.txt

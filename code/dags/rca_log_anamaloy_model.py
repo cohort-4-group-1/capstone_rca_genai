@@ -148,12 +148,15 @@ with DAG(
     catchup=False,
     tags=['logbert', 'mlflow', 'tensorflow']
 ) as dag:
+    
     training_task = PythonOperator(
         task_id="train_logbert",
         python_callable=train_logbert
     )
+    
     upload_trained_model_to_s3_task = PythonOperator(
         task_id="upload_trained_model_to_s3",
         python_callable=upload_trained_model_to_s3
     )
+    
     training_task >> upload_trained_model_to_s3_task
