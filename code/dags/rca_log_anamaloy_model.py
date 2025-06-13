@@ -13,7 +13,7 @@ import numpy as np
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
-EPOCHS = 5
+EPOCHS = 2
 BATCH_SIZE = 16
 MAX_LEN = 128
 LEARNING_RATE = 2e-5
@@ -102,7 +102,7 @@ def train_logbert_autoencoder():
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_param("max_len", MAX_LEN)
         mlflow.log_param("learning_rate", LEARNING_RATE)
-        mlflow.log_artifact("logbert_autoencoder_best.h5")
+        mlflow.log_model("logbert_autoencoder", model, registered_model_name="logbert_autoencoder_best")
 
     print("✅ Unsupervised training complete. Best model saved and tracked in MLflow.")
 
