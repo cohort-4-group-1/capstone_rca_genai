@@ -30,4 +30,5 @@ RUN pip install --no-cache-dir \
     mlflow \
     tensorflow==2.13.0 \
     keras==2.13.1 \
-    transformers==4.31.0
+    transformers==4.31.0 \
+    huggingface_hub
