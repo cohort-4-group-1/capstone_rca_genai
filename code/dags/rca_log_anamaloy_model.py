@@ -21,7 +21,7 @@ LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 HUGGINGFACE_MODEL_DIR = "rca_logbert_model"
 HF_REPO_ID = "sujit6779/rca_log"
-HF_TOKEN = "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" #os.getenv("HF_TOKEN")  # Set this in Airflow env
+HF_TOKEN = os.getenv("HF_TOKEN")  # Set this in Airflow env
 
 # Define training function
 def train_logbert():
@@ -108,7 +108,8 @@ def train_logbert():
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_param("max_len", MAX_LEN)
         mlflow.log_param("learning_rate", LEARNING_RATE)
-        mlflow.tensorflow.log_model(tf_saved_model_dir="logbert_autoencoder_best", artifact_path="logbert_model")
+        mlflow.tensorflow.log_model(model, artifact_path="rca_logbert_model")
+
 
     # Save full model for Hugging Face
     model.save(HUGGINGFACE_MODEL_DIR, save_format="tf")
