@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import os
 import configuration
 import numpy as np
+import boto3
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
@@ -111,6 +112,12 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 
+def upload_trained_model_to_s3():
+    s3 = boto3.client('s3')
+    model_path = "/opt/airflow/logbert_autoencoder_best.keras"
+    s3.upload_file(model_path, configuration.DEST_BUCKET, configuration.LOGBERT_AUTOENCODER_MODEL_KEY)
+    print("✅ Trained model uploaded to S3.")
+
 with DAG(
     dag_id='logbert_unsupervised_train_dag',
     start_date=start_date_utc,
@@ -122,6 +129,12 @@ with DAG(
         task_id="train_logbert_autoencoder",
         python_callable=train_logbert_autoencoder
     )
+    
+    upload_trained_model_to_s3_task = PythonOperator(
+        task_id="upload_trained_model_to_s3",
+        python_callable=upload_trained_model_to_s3
+    )
+    training_task >> upload_trained_model_to_s3_task
 
     
 
