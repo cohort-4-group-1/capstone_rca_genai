@@ -12,3 +12,5 @@ EDA_OUTPUT = 'logs/eda_output'
 
 AWS_REGION = 'us-east-1'
 
+LOGBERT_AUTOENCODER_MODEL_KEY = 'model/logbert_autoencoder_model'
+
