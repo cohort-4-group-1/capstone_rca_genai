@@ -250,7 +250,7 @@ class OpenStackLogPipeline:
         # Step-by-step summary
         self.logger.info("\nStep Results:")
         for step_name, step_result in results['steps'].items():
-            status = "✓ SUCCESS" if step_result['success'] else "✗ FAILED"
+            status = "SUCCESS" if step_result['success'] else "FAILED"
             duration = step_result.get('duration', 0)
             self.logger.info(f"  {step_name}: {status} ({duration:.2f}s)")
             

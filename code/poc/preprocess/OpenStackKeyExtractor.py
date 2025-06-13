@@ -144,14 +144,14 @@ class OpenStackLogParser:
             try:
                 match = re.match(template_info['regex'], test_content)
                 if match:
-                    print(f"✅ MATCH! Groups: {match.groups()}")
+                    print(f"MATCH! Groups: {match.groups()}")
                     return event_id, template_info['template']
                 else:
-                    print("❌ No match")
+                    print(" No match")
             except re.error as e:
-                print(f"❌ Regex error: {e}")
+                print(f" Regex error: {e}")
         
-        print("\n❌ No templates matched")
+        print("\n No templates matched")
         return None, None
     
     def parse_logs(self):
