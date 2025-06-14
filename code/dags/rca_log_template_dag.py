@@ -10,7 +10,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id="Step_3_rca_log_template_pipeline",
+    dag_id="rca_log_template_pipeline",
     schedule_interval=None,
     default_args=default_args,
     catchup=False,
