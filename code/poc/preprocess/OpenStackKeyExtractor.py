@@ -2,8 +2,16 @@ import re
 import csv
 import os
 from datetime import datetime
+import boto3
 
 # Try to import pandas, fallback to csv if not available
+SOURCE_BUCKET = 'rca.logs.openstack'
+DEST_BUCKET = 'rca.logs.openstack'
+FILE_KEY = 'raw/OpenStack_2k.log'
+TEMPLATE_KEY = 'raw/OpenStack_2k.log_templates.csv'
+OUTPUT_KEY = "silver/OpenStack_structured.csv"
+AWS_REGION = 'us-east-1'
+
 try:
     import pandas as pd
     HAS_PANDAS = True
@@ -12,13 +20,13 @@ except ImportError:
     print("Warning: pandas not found. Using csv module instead.")
 
 class OpenStackLogParser:
-    def __init__(self, log_file_path, template_file_path, debug=False):
+    def __init__(self, log_file_path, template_file_path, debug=False,s3):
         self.log_file_path = log_file_path
         self.template_file_path = template_file_path
         self.templates = {}
         self.parsed_logs = []
         self.debug = debug
-        
+        self.s3 = s3
     def debug_print(self, message):
         """Print debug messages if debug mode is enabled"""
         if self.debug:
@@ -192,6 +200,7 @@ class OpenStackLogParser:
                         file.write(f"{log_entry['template']}\n")
             
             print(f"Templates saved to {output_file}")
+            self.s3.put_object(Bucket=DEST_BUCKET, Key=OUTPUT_KEY, Body=output_file.getvalue())
             
         except Exception as e:
             print(f"Error saving results: {e}")
@@ -221,25 +230,31 @@ class OpenStackLogParser:
 
 def main():
     # File paths - modify these according to your file locations
-    log_file = 'OpenStack_2k.txt'  # Your log file
-    template_file = 'OpenStack_2k.log_templates.csv'  # Your template file
-    output_file = 'log_keys.txt'  # Output file
+    #log_file = 'OpenStack_2k.txt'  # Your log file
+    #template_file = 'OpenStack_2k.log_templates.csv'  # Your template file
+    #output_file = 'log_keys.txt'  # Output file
     
     # Check if files exist
-    if not os.path.exists(log_file):
-        print(f"Error: Log file '{log_file}' not found in current directory!")
-        print(f"Current directory: {os.getcwd()}")
-        print("Available files:", os.listdir('.'))
-        return
+    # if not os.path.exists(log_file):
+    #     print(f"Error: Log file '{log_file}' not found in current directory!")
+    #     print(f"Current directory: {os.getcwd()}")
+    #     print("Available files:", os.listdir('.'))
+    #     return
     
-    if not os.path.exists(template_file):
-        print(f"Error: Template file '{template_file}' not found in current directory!")
-        print(f"Current directory: {os.getcwd()}")
-        print("Available files:", os.listdir('.'))
-        return
-    
+    # if not os.path.exists(template_file):
+    #     print(f"Error: Template file '{template_file}' not found in current directory!")
+    #     print(f"Current directory: {os.getcwd()}")
+    #     print("Available files:", os.listdir('.'))
+    #     return
+    s3 = boto3.client('s3', region_name=AWS_REGION)
+    print("Create S3 object")
+    obj = s3.get_object(Bucket=SOURCE_BUCKET, Key=FILE_KEY)
+    log_file = obj['Body'].read().decode('utf-8')
+    template_obj = s3.get_object(Bucket=SOURCE_BUCKET, Key=TEMPLATE_KEY)
+    template_file = template_obj['Body'].read().decode('utf-8')
+    output_file = 'log_keys.txt'
     # Create parser instance with debug enabled
-    parser = OpenStackLogParser(log_file, template_file, debug=True)
+    parser = OpenStackLogParser(log_file, template_file, debug=True,s3)
     
     # Load templates
     print("Loading templates...")
