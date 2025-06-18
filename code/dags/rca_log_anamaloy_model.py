@@ -122,22 +122,24 @@ def train_and_upload_rca_model():
     print("Model will be uploaded")
     if os.path.exists(LOCAL_MODEL_DIR):
         shutil.rmtree(LOCAL_MODEL_DIR)
-        model.save(LOCAL_MODEL_DIR)
 
-        # ------------------------------------------------------------------------------
-        # Compress directory into .tar.gz
-        if os.path.exists(ARCHIVE_FILE):
-            os.remove(ARCHIVE_FILE)
+    os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)        
+    model.save(LOCAL_MODEL_DIR)
 
-        with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
-            tar.add(LOCAL_MODEL_DIR, arcname=os.path.basename(LOCAL_MODEL_DIR))
+    # ------------------------------------------------------------------------------
+    # Compress directory into .tar.gz
+    if os.path.exists(ARCHIVE_FILE):
+        os.remove(ARCHIVE_FILE)
 
-        # ------------------------------------------------------------------------------
-        # AWS S3 upload
-        s3 = boto3.client("s3")
-        s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
+    with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
+        tar.add(LOCAL_MODEL_DIR, arcname=os.path.basename(LOCAL_MODEL_DIR))
 
-        print(f"✅ Model successfully compressed and uploaded to s3://{S3_BUCKET}/{S3_KEY}")
+    # ------------------------------------------------------------------------------
+    # AWS S3 upload
+    s3 = boto3.client("s3")
+    s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
+
+    print(f"✅ Model successfully compressed and uploaded to s3://{S3_BUCKET}/{S3_KEY}")
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
 now_utc = datetime.now(timezone.utc)
