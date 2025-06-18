@@ -10,7 +10,10 @@ from datetime import datetime, timedelta, timezone
 import os
 import configuration
 import numpy as np
-from huggingface_hub import HfApi, HfFolder, upload_folder
+import shutil
+import tarfile
+import boto3
+
 
 # Configuration
 MODEL_NAME = "bert-base-uncased"
@@ -19,12 +22,13 @@ BATCH_SIZE = 16
 MAX_LEN = 128
 LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
-HUGGINGFACE_MODEL_DIR = "/opt/airflow/rca_logbert_model"
-HF_REPO_ID = "sujit6779/rca_log"
-HF_API_TOKEN = "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" #os.getenv("HF_TOKEN")  # Set this in Airflow env
+S3_BUCKET = configuration.DEST_BUCKET
+S3_KEY = configuration.MODEL_OUTPUT
 
+LOCAL_MODEL_DIR = "/tmp/rca-model"
+ARCHIVE_FILE = "/tmp/rca-log-model.tar.gz"
 # Define training function
-def train_logbert():
+def train_and_upload_rca_model():
     print("Started train_logbert")
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
     mlflow.tensorflow.autolog()
@@ -113,22 +117,27 @@ def train_logbert():
     print("Model Training is completed")
     # Save full model for Hugging Face
     print("Model will be saved")
-    model.save(HUGGINGFACE_MODEL_DIR, save_format="tf")
 
     # Upload to Hugging Face
     print("Model will be uploaded")
-    if HF_API_TOKEN:
-        print("Model will be uploaded: HF_API_TOKEN is set")
-        HfFolder.save_token(HF_API_TOKEN)
-        upload_folder(
-            folder_path=HUGGINGFACE_MODEL_DIR,
-            repo_id=HF_REPO_ID,
-            repo_type="model",
-            commit_message="Upload full trained LogBERT autoencoder"
-        )
-        print(f"✅ Model uploaded to https://huggingface.co/{HF_REPO_ID}")
-    else:
-        print("⚠️ HF_API_TOKEN not set. Skipping upload to Hugging Face.")
+    if os.path.exists(LOCAL_MODEL_DIR):
+        shutil.rmtree(LOCAL_MODEL_DIR)
+        model.save(LOCAL_MODEL_DIR)
+
+        # ------------------------------------------------------------------------------
+        # Compress directory into .tar.gz
+        if os.path.exists(ARCHIVE_FILE):
+            os.remove(ARCHIVE_FILE)
+
+        with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
+            tar.add(LOCAL_MODEL_DIR, arcname=os.path.basename(LOCAL_MODEL_DIR))
+
+        # ------------------------------------------------------------------------------
+        # AWS S3 upload
+        s3 = boto3.client("s3")
+        s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
+
+        print(f"✅ Model successfully compressed and uploaded to s3://{S3_BUCKET}/{S3_KEY}")
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
 now_utc = datetime.now(timezone.utc)
@@ -142,6 +151,6 @@ with DAG(
     tags=['logbert', 'mlflow', 'tensorflow']
 ) as dag:
     training_task = PythonOperator(
-        task_id="train_logbert",
-        python_callable=train_logbert
+        task_id="train_and_upload_to_s3_rca_model",
+        python_callable=train_and_upload_rca_model
     )
