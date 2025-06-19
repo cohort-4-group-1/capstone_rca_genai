@@ -121,21 +121,28 @@ def train_and_upload_rca_model():
     # Upload to Hugging Face
     print("Model will be uploaded")
     if os.path.exists(LOCAL_MODEL_DIR):
+        print(f'{LOCAL_MODEL_DIR} path exists and will be removed')
         shutil.rmtree(LOCAL_MODEL_DIR)
 
-    os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)        
+    os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)
+    print(f'{LOCAL_MODEL_DIR} has been created if not exists')        
     model.save(LOCAL_MODEL_DIR)
+    print(f'model is saved in {LOCAL_MODEL_DIR}')        
+
 
     # ------------------------------------------------------------------------------
     # Compress directory into .tar.gz
     if os.path.exists(ARCHIVE_FILE):
+        print(f'{ARCHIVE_FILE} path exists and will be removed')
         os.remove(ARCHIVE_FILE)
 
     with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
+        print(f'{LOCAL_MODEL_DIR} is added in {ARCHIVE_FILE} ')
         tar.add(LOCAL_MODEL_DIR, arcname=os.path.basename(LOCAL_MODEL_DIR))
 
     # ------------------------------------------------------------------------------
     # AWS S3 upload
+    print(f'started to upoad {ARCHIVE_FILE} is {S3_BUCKET} with file key {S3_KEY}')
     s3 = boto3.client("s3")
     s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
 
