@@ -135,6 +135,8 @@ def train_and_upload_rca_model():
     if os.path.exists(ARCHIVE_FILE):
         print(f'{ARCHIVE_FILE} path exists and will be removed')
         os.remove(ARCHIVE_FILE)
+    
+    print(f'styarted to add in archive file {ARCHIVE_FILE}')
 
     with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
         print(f'{LOCAL_MODEL_DIR} is added in {ARCHIVE_FILE} ')
@@ -142,7 +144,7 @@ def train_and_upload_rca_model():
 
     # ------------------------------------------------------------------------------
     # AWS S3 upload
-    print(f'started to upoad {ARCHIVE_FILE} is {S3_BUCKET} with file key {S3_KEY}')
+    print(f'started to upoad {ARCHIVE_FILE} in {S3_BUCKET} with file key {S3_KEY}')
     s3 = boto3.client("s3")
     s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
 
