@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: logbert-ui
+spec:
+  type: {{ .Values.ui.service.type }}
+  selector:
+    app: logbert-ui
+  ports:
+    - port: 80
+      targetPort: {{ .Values.ui.image.port }}

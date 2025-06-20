@@ -375,6 +375,33 @@ resource "aws_iam_role" "dask_s3_access_sa" {
     }]
   })
 }
+
+resource "aws_iam_role" "logbert_model_s3_access_sa" {
+  name = "${var.name_prefix}-model-s3-access"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Condition = {
+       StringEquals = {
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:logbert-model:logbert-s3-access"
+        "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "logbert_model_scheduler_s3_access_sa" {
+  role       = aws_iam_role.logbert_model_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
 resource "kubernetes_namespace" "dask" {
   metadata {
     name = "dask"
