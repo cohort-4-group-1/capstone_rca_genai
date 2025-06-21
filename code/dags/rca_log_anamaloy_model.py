@@ -35,8 +35,8 @@ def train_and_upload_rca_model():
     mlflow.tensorflow.autolog()
     print("After mlflow")
     # Load tokenizer and model
-    tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
-    bert_model = TFBertModel.from_pretrained(MODEL_NAME)
+    tokenizer = BertTokenizer.from_pretrained(MODEL_NAME,cache_dir="/home/airflow/.cache/huggingface")
+    bert_model = TFBertModel.from_pretrained(MODEL_NAME,cache_dir="/home/airflow/.cache/huggingface")
 
     # Load session sequences (no labels needed)
     df = pd.read_csv(DATA_PATH)
