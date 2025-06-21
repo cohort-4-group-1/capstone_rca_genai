@@ -27,6 +27,7 @@ S3_KEY = configuration.MODEL_OUTPUT
 
 LOCAL_MODEL_DIR = "/tmp/rca-model"
 ARCHIVE_FILE = "/tmp/rca-log-model.tar.gz"
+CHECKPOINT_DIR = "rca_logbert_model"
 # Define training function
 def train_and_upload_rca_model():
     print("Started train_logbert")
@@ -135,6 +136,8 @@ def train_and_upload_rca_model():
     if os.path.exists(ARCHIVE_FILE):
         print(f'{ARCHIVE_FILE} path exists and will be removed')
         os.remove(ARCHIVE_FILE)
+    
+    print(f'styarted to add in archive file {ARCHIVE_FILE}')
 
     with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
         print(f'{LOCAL_MODEL_DIR} is added in {ARCHIVE_FILE} ')
@@ -142,11 +145,24 @@ def train_and_upload_rca_model():
 
     # ------------------------------------------------------------------------------
     # AWS S3 upload
-    print(f'started to upoad {ARCHIVE_FILE} is {S3_BUCKET} with file key {S3_KEY}')
+    print(f'started to upoad {ARCHIVE_FILE} in {S3_BUCKET} with file key {S3_KEY}')
     s3 = boto3.client("s3")
     s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
 
     print(f"✅ Model successfully compressed and uploaded to s3://{S3_BUCKET}/{S3_KEY}")
+
+    shutil.rmtree(CHECKPOINT_DIR)
+    print(f" Deleted local checkpoint dir: {CHECKPOINT_DIR}")
+
+    shutil.rmtree(LOCAL_MODEL_DIR)
+    print(f" Deleted local model: {LOCAL_MODEL_DIR}")
+    shutil.rmtree(ARCHIVE_FILE)
+    print(f" Deleted Archive file: {ARCHIVE_FILE}")
+
+    if os.path.exists(os.path.expanduser("~/.cache")):
+        shutil.rmtree(os.path.expanduser("~/.cache"))
+        print("🧹 Deleted cache directory ~/.cache")
+    
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
 now_utc = datetime.now(timezone.utc)

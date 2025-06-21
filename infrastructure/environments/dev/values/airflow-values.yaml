@@ -13,16 +13,27 @@ dags:
     depth: 1 
 
 workers:
+  hpa:
+    enabled: true
+    minReplicaCount: 1
+    maxReplicaCount: 5
+    metrics:
+      - type: Resource
+        resource:
+          name: memory
+          target:
+            type: Utilization
+            averageUtilization: 80
   serviceAccount:      
-      # Specifies whether a ServiceAccount should be created
-      create: true
-      # The name of the ServiceAccount to use.
-      # If not set and create is true, a name is generated using the release name
-      name: airflow-worker-test
+        # Specifies whether a ServiceAccount should be created
+        create: true
+        # The name of the ServiceAccount to use.
+        # If not set and create is true, a name is generated using the release name
+        name: airflow-worker-test
 
-      # Annotations to add to worker kubernetes service account.
-      annotations:
-        eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-s3-access  
+        # Annotations to add to worker kubernetes service account.
+        annotations:
+          eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-s3-access  
 webserver:
   serviceAccount:      
       # Specifies whether a ServiceAccount should be created

@@ -1,0 +1,19 @@
+global:
+  region: us-east-1
+  serviceAccount:
+    name: logbert-s3-access
+    roleArn: arn:aws:iam::141134438799:role/<YOUR_IAM_ROLE_NAME>
+
+api:
+  image:
+    repository: sujittah/logbert-api
+    tag: latest
+    port: 8000
+
+ui:
+  image:
+    repository: sujitttah/logbert-ui
+    tag: latest
+    port: 7860
+  service:
+    type: LoadBalancer
