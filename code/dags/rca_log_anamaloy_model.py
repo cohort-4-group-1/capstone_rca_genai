@@ -35,8 +35,8 @@ def train_and_upload_rca_model():
     mlflow.tensorflow.autolog()
     print("After mlflow")
     # Load tokenizer and model
-    tokenizer = BertTokenizer.from_pretrained(MODEL_NAME,cache_dir="/home/airflow/.cache/huggingface")
-    bert_model = TFBertModel.from_pretrained(MODEL_NAME,cache_dir="/home/airflow/.cache/huggingface")
+    tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
+    bert_model = TFBertModel.from_pretrained(MODEL_NAME)
 
     # Load session sequences (no labels needed)
     df = pd.read_csv(DATA_PATH)
@@ -82,7 +82,7 @@ def train_and_upload_rca_model():
 
     # Define checkpoint callback
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath="rca_logbert_model",
+        filepath=CHECKPOINT_DIR,
         save_best_only=True,
         monitor="val_loss",
         mode="min",
@@ -120,48 +120,29 @@ def train_and_upload_rca_model():
     print("Model will be saved")
 
     # Upload to Hugging Face
-    print("Model will be uploaded")
-    if os.path.exists(LOCAL_MODEL_DIR):
-        print(f'{LOCAL_MODEL_DIR} path exists and will be removed')
-        shutil.rmtree(LOCAL_MODEL_DIR)
-
-    os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)
-    print(f'{LOCAL_MODEL_DIR} has been created if not exists')        
-    model.save(LOCAL_MODEL_DIR)
-    print(f'model is saved in {LOCAL_MODEL_DIR}')        
+    print("Model will be uploaded")       
+    model.save(CHECKPOINT_DIR)
+    print(f'model is saved in {CHECKPOINT_DIR}')        
 
 
-    # ------------------------------------------------------------------------------
-    # Compress directory into .tar.gz
-    if os.path.exists(ARCHIVE_FILE):
-        print(f'{ARCHIVE_FILE} path exists and will be removed')
-        os.remove(ARCHIVE_FILE)
-    
-    print(f'styarted to add in archive file {ARCHIVE_FILE}')
-
-    with tarfile.open(ARCHIVE_FILE, "w:gz") as tar:
-        print(f'{LOCAL_MODEL_DIR} is added in {ARCHIVE_FILE} ')
-        tar.add(LOCAL_MODEL_DIR, arcname=os.path.basename(LOCAL_MODEL_DIR))
-
-    # ------------------------------------------------------------------------------
     # AWS S3 upload
-    print(f'started to upoad {ARCHIVE_FILE} in {S3_BUCKET} with file key {S3_KEY}')
+    print(f'started to upoad {CHECKPOINT_DIR} in {S3_BUCKET} with file key {S3_KEY}')
     s3 = boto3.client("s3")
-    s3.upload_file(ARCHIVE_FILE, S3_BUCKET, S3_KEY)
+    for root, dirs, files in os.walk(CHECKPOINT_DIR):
+        for file in files:
+            local_path = os.path.join(root, file)
+            s3.upload_file(local_path, S3_BUCKET, S3_KEY)
+            print(f"✅ Uploaded {local_path} to s3://{S3_BUCKET}/{S3_KEY}")
 
-    print(f"✅ Model successfully compressed and uploaded to s3://{S3_BUCKET}/{S3_KEY}")
-
+    # Cleanup
     shutil.rmtree(CHECKPOINT_DIR)
-    print(f" Deleted local checkpoint dir: {CHECKPOINT_DIR}")
-
-    shutil.rmtree(LOCAL_MODEL_DIR)
-    print(f" Deleted local model: {LOCAL_MODEL_DIR}")
-    shutil.rmtree(ARCHIVE_FILE)
-    print(f" Deleted Archive file: {ARCHIVE_FILE}")
+    print(f"🧹 Deleted local checkpoint dir: {CHECKPOINT_DIR}")
 
     if os.path.exists(os.path.expanduser("~/.cache")):
         shutil.rmtree(os.path.expanduser("~/.cache"))
         print("🧹 Deleted cache directory ~/.cache")
+
+    print("✅ Training complete and checkpoint saved to S3.")
     
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
