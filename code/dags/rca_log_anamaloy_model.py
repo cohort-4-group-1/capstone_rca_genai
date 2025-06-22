@@ -4,45 +4,38 @@ import pandas as pd
 import mlflow
 import mlflow.tensorflow
 from sklearn.model_selection import train_test_split
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta, timezone
 import os
 import configuration
-import numpy as np
-import shutil
-import tarfile
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
 import boto3
 
-
-# Configuration
-MODEL_NAME = "bert-base-uncased"
-EPOCHS = 1
-BATCH_SIZE = 16
-MAX_LEN = 128
-LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 S3_BUCKET = configuration.DEST_BUCKET
 S3_KEY = configuration.MODEL_OUTPUT
 
-LOCAL_MODEL_DIR = "/tmp/rca-model"
-ARCHIVE_FILE = "/tmp/rca-log-model.tar.gz"
+tf.config.optimizer.set_jit(True)  # Enable XLA
+policy = mixed_precision.Policy('mixed_float16')
+mixed_precision.set_policy(policy)
+
+# Constants
+MODEL_NAME = "bert-base-uncased"
+EPOCHS = 1
+BATCH_SIZE = 64
+MAX_LEN = 64
+LEARNING_RATE = 2e-5
+DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 CHECKPOINT_DIR = "rca_logbert_model"
-# Define training function
-def train_and_upload_rca_model():
-    print("Started train_logbert")
+
+def train_logbert_autoencoder():
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
     mlflow.tensorflow.autolog()
-    print("After mlflow")
-    # Load tokenizer and model
+
     tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
     bert_model = TFBertModel.from_pretrained(MODEL_NAME)
 
-    # Load session sequences (no labels needed)
     df = pd.read_csv(DATA_PATH)
     sequences = df["sequence"].tolist()
 
-    # Tokenize all sequences
     tokens = tokenizer(
         sequences,
         max_length=MAX_LEN,
@@ -50,72 +43,67 @@ def train_and_upload_rca_model():
         truncation=True,
         return_tensors="tf"
     )
-    print("After token")
-    input_ids = tokens["input_ids"]
-    attention_mask = tokens["attention_mask"]
 
-    input_ids_np = input_ids.numpy()
-    attention_mask_np = attention_mask.numpy()
+    input_ids = tokens["input_ids"].numpy()
+    attention_mask = tokens["attention_mask"].numpy()
 
-    # Split into train/val sets
+    # Split
     train_ids, val_ids, train_mask, val_mask = train_test_split(
-        input_ids_np, attention_mask_np, test_size=0.2, random_state=42
+        input_ids, attention_mask, test_size=0.2, random_state=42
     )
 
-    # Convert to tensors
-    train_ids = tf.convert_to_tensor(train_ids)
-    train_mask = tf.convert_to_tensor(train_mask)
-    val_ids = tf.convert_to_tensor(val_ids)
-    val_mask = tf.convert_to_tensor(val_mask)
-
-    # Define autoencoder using Functional API
+    # Define model
     input_ids_in = tf.keras.Input(shape=(MAX_LEN,), dtype=tf.int32, name="input_ids")
     attention_mask_in = tf.keras.Input(shape=(MAX_LEN,), dtype=tf.int32, name="attention_mask")
     bert_output = bert_model(input_ids=input_ids_in, attention_mask=attention_mask_in)
     cls_token = bert_output.last_hidden_state[:, 0, :]
     encoded = tf.keras.layers.Dense(768, activation="relu")(cls_token)
-    reconstructed = tf.keras.layers.Dense(768)(encoded)
+    reconstructed = tf.keras.layers.Dense(768, dtype='float32')(encoded)  # Force output to float32
 
     model = tf.keras.Model(inputs=[input_ids_in, attention_mask_in], outputs=reconstructed)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
-                  loss=tf.keras.losses.MeanSquaredError())
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss=tf.keras.losses.MeanSquaredError()
+    )
 
-    # Define checkpoint callback
+    # Build datasets
+    def create_dataset(ids, masks):
+        ds = tf.data.Dataset.from_tensor_slices((
+            {"input_ids": ids, "attention_mask": masks},
+            model({"input_ids": ids, "attention_mask": masks})
+        ))
+        return ds.cache().shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+
+    train_ds = create_dataset(train_ids, train_mask)
+    val_ds = create_dataset(val_ids, val_mask)
+
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
         filepath=CHECKPOINT_DIR,
         save_best_only=True,
         monitor="val_loss",
         mode="min",
-        verbose=0,
+        verbose=1,
         save_format="tf"
     )
-    print("Model Training has been started")
-    # Start MLflow run
+
     with mlflow.start_run():
-        history = model.fit(
-            x={"input_ids": train_ids, "attention_mask": train_mask},
-            y=model({"input_ids": train_ids, "attention_mask": train_mask}),
-            validation_data=(
-                {"input_ids": val_ids, "attention_mask": val_mask},
-                model({"input_ids": val_ids, "attention_mask": val_mask})
-            ),
-            batch_size=BATCH_SIZE,
+        model.fit(
+            train_ds,
+            validation_data=val_ds,
             epochs=EPOCHS,
             callbacks=[checkpoint_cb]
-        )        
-        train_loss = history.history['loss'][-1]
-        val_loss = history.history['val_loss'][-1]
+        )
 
-        mlflow.log_metric("final_train_loss", train_loss)
-        mlflow.log_metric("final_val_loss", val_loss)
         mlflow.log_param("model_name", MODEL_NAME)
         mlflow.log_param("epochs", EPOCHS)
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_param("max_len", MAX_LEN)
         mlflow.log_param("learning_rate", LEARNING_RATE)
-        mlflow.tensorflow.log_model(model, artifact_path="rca_logbert_model")
+        mlflow.tensorflow.log_model(tf_saved_model_dir=CHECKPOINT_DIR, artifact_path="logbert_model")
 
-    print("Model Training is completed")
+    print("✅ Optimized training complete. Model saved and tracked.")
+
+
     # Save full model for Hugging Face
     print("Model will be saved")
 
