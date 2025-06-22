@@ -34,7 +34,7 @@ def train_and_upload_to_s3_rca_model():
 
     print ("set mlflow tracking")
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
-    mlflow.tensorflow.autolog()
+    mlflow.tensorflow.autolog(log_models=True)
 
     print ("Download token and model")
     tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
@@ -68,7 +68,7 @@ def train_and_upload_to_s3_rca_model():
     bert_output = bert_model(input_ids=input_ids_in, attention_mask=attention_mask_in)
     cls_token = bert_output.last_hidden_state[:, 0, :]
     encoded = tf.keras.layers.Dense(768, activation="relu")(cls_token)
-    reconstructed = tf.keras.layers.Dense(768, dtype='float32')(encoded)  # Force output to float32
+    reconstructed = tf.keras.layers.Dense(768)(encoded)  
 
     model = tf.keras.Model(inputs=[input_ids_in, attention_mask_in], outputs=reconstructed)
     print ("compile model")
@@ -81,11 +81,8 @@ def train_and_upload_to_s3_rca_model():
     print ("Build datasets")
 
     def create_dataset(ids, masks):
-        ds = tf.data.Dataset.from_tensor_slices((
-            {"input_ids": ids, "attention_mask": masks},
-            model({"input_ids": ids, "attention_mask": masks})
-        ))
-        return ds.cache().shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+            x = {"input_ids": ids, "attention_mask": masks}
+            return tf.data.Dataset.from_tensor_slices((x, x)).cache().shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
     train_ds = create_dataset(train_ids, train_mask)
     val_ds = create_dataset(val_ids, val_mask)
@@ -98,16 +95,18 @@ def train_and_upload_to_s3_rca_model():
         verbose=1,
         save_format="tf"
     )
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
+
     print ("strat training for  model")
     with mlflow.start_run():
         model.fit(
             train_ds,
             validation_data=val_ds,
             epochs=EPOCHS,
-            callbacks=[checkpoint_cb]
+            callbacks=[checkpoint_cb,early_stop]
         )
 
-        mlflow.log_param("model_name", MODEL_NAME)
+        #mlflow.log_param("model_name", MODEL_NAME)
         mlflow.log_param("epochs", EPOCHS)
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_param("max_len", MAX_LEN)
@@ -132,13 +131,17 @@ def train_and_upload_to_s3_rca_model():
     for root, dirs, files in os.walk(CHECKPOINT_DIR):
         for file in files:
             local_path = os.path.join(root, file)
-            #rel_path = os.path.relpath(local_path, CHECKPOINT_DIR)
-            s3.upload_file(local_path, S3_BUCKET, f"{S3_KEY}/{S3_KEY}")
-            print(f"✅ Uploaded {local_path} to s3://{S3_BUCKET}/{S3_KEY}")
+            rel_path = os.path.relpath(local_path, CHECKPOINT_DIR)
+            s3.upload_file(local_path, S3_BUCKET, f"{S3_KEY}/{rel_path}")
+            print(f"✅ Uploaded {local_path} to s3://{S3_BUCKET}/{S3_KEY}/{rel_path}")
 
     # Cleanup
     shutil.rmtree(CHECKPOINT_DIR)
     print(f"🧹 Deleted local checkpoint dir: {CHECKPOINT_DIR}")
+    hf_cache = os.path.expanduser("~/.cache/huggingface")
+    if os.path.exists(hf_cache):
+        shutil.rmtree(hf_cache)        
+        print("🧹 Deleted huggingface cache directory")
 
     if os.path.exists(os.path.expanduser("~/.cache")):
         shutil.rmtree(os.path.expanduser("~/.cache"))
