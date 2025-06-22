@@ -80,14 +80,18 @@ def train_and_upload_to_s3_rca_model():
     # Build datasets
     print ("Build datasets")
     model.build(input_shape={"input_ids": (None, MAX_LEN), "attention_mask": (None, MAX_LEN)})
+
+    @tf.function
+    def build_inputs_and_targets(input_ids, attention_mask):
+        inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
+        targets = model(inputs, training=False)
+        return inputs, targets
+
     def create_dataset(ids, masks):
-        x = {"input_ids": ids, "attention_mask": masks}
-        y = model(x, training=False)  # Get reconstructed CLS targets
-        return tf.data.Dataset.from_tensor_slices((x, y))\
-            .cache()\
-            .shuffle(1000)\
-            .batch(BATCH_SIZE)\
-            .prefetch(tf.data.AUTOTUNE)
+        ds = tf.data.Dataset.from_tensor_slices((ids, masks))
+        ds = ds.map(build_inputs_and_targets, num_parallel_calls=tf.data.AUTOTUNE)
+        ds = ds.shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+        return ds
 
 
     train_ds = create_dataset(train_ids, train_mask)
