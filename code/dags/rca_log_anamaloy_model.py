@@ -17,8 +17,6 @@ DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE
 S3_BUCKET = configuration.DEST_BUCKET
 S3_KEY = configuration.MODEL_OUTPUT
 
-tf.config.optimizer.set_jit(True)  # Enable XLA
-mixed_precision.set_global_policy('mixed_float16')
 
 # Constants
 MODEL_NAME = "bert-base-uncased"
@@ -30,12 +28,19 @@ DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE
 CHECKPOINT_DIR = "rca_logbert_model"
 
 def train_and_upload_to_s3_rca_model():
+    print ("set XLA and floating point")
+    tf.config.optimizer.set_jit(True)  # Enable XLA
+    mixed_precision.set_global_policy('mixed_float16')
+
+    print ("set mlflow tracking")
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
     mlflow.tensorflow.autolog()
 
+    print ("Download token and model")
     tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
     bert_model = TFBertModel.from_pretrained(MODEL_NAME)
 
+    print ("Read dataset")
     df = pd.read_csv(DATA_PATH)
     sequences = df["sequence"].tolist()
 
@@ -50,12 +55,14 @@ def train_and_upload_to_s3_rca_model():
     input_ids = tokens["input_ids"].numpy()
     attention_mask = tokens["attention_mask"].numpy()
 
+    print ("split the dataset for training and test")
     # Split
     train_ids, val_ids, train_mask, val_mask = train_test_split(
         input_ids, attention_mask, test_size=0.2, random_state=42
     )
 
     # Define model
+    print ("Define model")
     input_ids_in = tf.keras.Input(shape=(MAX_LEN,), dtype=tf.int32, name="input_ids")
     attention_mask_in = tf.keras.Input(shape=(MAX_LEN,), dtype=tf.int32, name="attention_mask")
     bert_output = bert_model(input_ids=input_ids_in, attention_mask=attention_mask_in)
@@ -64,6 +71,7 @@ def train_and_upload_to_s3_rca_model():
     reconstructed = tf.keras.layers.Dense(768, dtype='float32')(encoded)  # Force output to float32
 
     model = tf.keras.Model(inputs=[input_ids_in, attention_mask_in], outputs=reconstructed)
+    print ("compile model")
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
         loss=tf.keras.losses.MeanSquaredError()
@@ -88,7 +96,7 @@ def train_and_upload_to_s3_rca_model():
         verbose=1,
         save_format="tf"
     )
-
+    print ("strat training for  model")
     with mlflow.start_run():
         model.fit(
             train_ds,
