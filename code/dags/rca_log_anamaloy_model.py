@@ -30,7 +30,8 @@ CHECKPOINT_DIR = "rca_logbert_model"
 def train_and_upload_to_s3_rca_model():
     print ("set XLA and floating point")
     tf.config.optimizer.set_jit(True)  # Enable XLA
-    mixed_precision.set_global_policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy("float32")
+
 
     print ("set mlflow tracking")
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
