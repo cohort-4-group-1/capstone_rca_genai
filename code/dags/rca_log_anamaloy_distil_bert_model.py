@@ -21,7 +21,7 @@ S3_KEY = configuration.MODEL_OUTPUT
 # Constants
 MODEL_NAME = "distilbert-base-uncased"
 EPOCHS = 1
-BATCH_SIZE = 64
+BATCH_SIZE = 16
 MAX_LEN = 64
 LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
@@ -172,7 +172,7 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id='rca_anamoly_logbert_model_train_distilbert"',
+    dag_id='rca_anamoly_test_model"',
     start_date=start_date_utc,
     schedule_interval="@daily",
     catchup=False,
