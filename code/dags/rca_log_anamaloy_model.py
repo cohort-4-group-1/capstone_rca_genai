@@ -79,10 +79,16 @@ def train_and_upload_to_s3_rca_model():
 
     # Build datasets
     print ("Build datasets")
-
+    model.build(input_shape={"input_ids": (None, MAX_LEN), "attention_mask": (None, MAX_LEN)})
     def create_dataset(ids, masks):
-            x = {"input_ids": ids, "attention_mask": masks}
-            return tf.data.Dataset.from_tensor_slices((x, x)).cache().shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+        x = {"input_ids": ids, "attention_mask": masks}
+        y = model(x, training=False)  # Get reconstructed CLS targets
+        return tf.data.Dataset.from_tensor_slices((x, y))\
+            .cache()\
+            .shuffle(1000)\
+            .batch(BATCH_SIZE)\
+            .prefetch(tf.data.AUTOTUNE)
+
 
     train_ds = create_dataset(train_ids, train_mask)
     val_ds = create_dataset(val_ids, val_mask)
@@ -98,7 +104,7 @@ def train_and_upload_to_s3_rca_model():
     early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
 
     print ("strat training for  model")
-    with mlflow.start_run():
+    with mlflow.start_run():           
         model.fit(
             train_ds,
             validation_data=val_ds,
