@@ -6,7 +6,7 @@ import mlflow.tensorflow
 from sklearn.model_selection import train_test_split
 import os
 import configuration
-from tensorflow.keras.mixed_precision import experimental as mixed_precision
+from tensorflow.keras import mixed_precision
 import boto3
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -18,8 +18,7 @@ S3_BUCKET = configuration.DEST_BUCKET
 S3_KEY = configuration.MODEL_OUTPUT
 
 tf.config.optimizer.set_jit(True)  # Enable XLA
-policy = mixed_precision.Policy('mixed_float16')
-mixed_precision.set_policy(policy)
+mixed_precision.set_global_policy('mixed_float16')
 
 # Constants
 MODEL_NAME = "bert-base-uncased"
@@ -30,7 +29,7 @@ LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 CHECKPOINT_DIR = "rca_logbert_model"
 
-def train_logbert_autoencoder():
+def train_and_upload_to_s3_rca_model():
     mlflow.set_tracking_uri("http://mlflow.mlflow.svc.cluster.local:5000")
     mlflow.tensorflow.autolog()
 
@@ -123,7 +122,8 @@ def train_logbert_autoencoder():
     for root, dirs, files in os.walk(CHECKPOINT_DIR):
         for file in files:
             local_path = os.path.join(root, file)
-            s3.upload_file(local_path, S3_BUCKET, S3_KEY)
+            #rel_path = os.path.relpath(local_path, CHECKPOINT_DIR)
+            s3.upload_file(local_path, S3_BUCKET, f"{S3_KEY}/{S3_KEY}")
             print(f"✅ Uploaded {local_path} to s3://{S3_BUCKET}/{S3_KEY}")
 
     # Cleanup
@@ -150,5 +150,5 @@ with DAG(
 ) as dag:
     training_task = PythonOperator(
         task_id="train_and_upload_to_s3_rca_model",
-        python_callable=train_and_upload_rca_model
+        python_callable=train_and_upload_to_s3_rca_model
     )

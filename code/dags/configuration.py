@@ -9,7 +9,7 @@ STRUCTURED_WITH_LOG_KEY='gold/OpenStack_structured_with_log_key.csv'
 LOG_SEQUENCE__FILE_KEY='gold/logbert_template_text_input.csv'
 
 EDA_OUTPUT = 'logs/eda_output'
-MODEL_OUTPUT = 'model/rca-log-model.tar.gz'
+MODEL_OUTPUT = 'model/logbert'
 
 AWS_REGION = 'us-east-1'
 
