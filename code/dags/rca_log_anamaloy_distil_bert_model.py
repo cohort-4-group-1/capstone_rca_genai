@@ -172,7 +172,7 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id='rca_anamoly_test_model"',
+    dag_id='rca_anamoly_logbert_model_train_distilbert',
     start_date=start_date_utc,
     schedule_interval="@daily",
     catchup=False,
