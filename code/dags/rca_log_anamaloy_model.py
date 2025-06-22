@@ -81,17 +81,23 @@ def train_and_upload_to_s3_rca_model():
     print ("Build datasets")
     model.build(input_shape={"input_ids": (None, MAX_LEN), "attention_mask": (None, MAX_LEN)})
 
-    @tf.function
-    def build_inputs_and_targets(input_ids, attention_mask):
-        inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
-        targets = model(inputs, training=False)
-        return inputs, targets
-
     def create_dataset(ids, masks):
         ds = tf.data.Dataset.from_tensor_slices((ids, masks))
-        ds = ds.map(build_inputs_and_targets, num_parallel_calls=tf.data.AUTOTUNE)
-        ds = ds.shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+        ds = ds.shuffle(1000)
+        ds = ds.batch(BATCH_SIZE)
+        
+        @tf.function
+        def add_targets(input_ids, attention_mask):
+            inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
+            targets = model(inputs, training=False)
+            return inputs, targets
+
+        ds = ds.map(lambda input_ids, attention_mask: add_targets(input_ids, attention_mask),
+                    num_parallel_calls=tf.data.AUTOTUNE)
+
+        ds = ds.prefetch(tf.data.AUTOTUNE)
         return ds
+
 
 
     train_ds = create_dataset(train_ids, train_mask)
