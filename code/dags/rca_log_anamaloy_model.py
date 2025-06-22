@@ -81,23 +81,13 @@ def train_and_upload_to_s3_rca_model():
     print ("Build datasets")
     model.build(input_shape={"input_ids": (None, MAX_LEN), "attention_mask": (None, MAX_LEN)})
 
-    def create_dataset(ids, masks):
-        ds = tf.data.Dataset.from_tensor_slices((ids, masks))
-        ds = ds.shuffle(1000)
-        ds = ds.batch(BATCH_SIZE)
-        
-        @tf.function
-        def add_targets(input_ids, attention_mask):
-            inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
-            targets = model(inputs, training=False)
-            return inputs, targets
-
-        ds = ds.map(lambda input_ids, attention_mask: add_targets(input_ids, attention_mask),
-                    num_parallel_calls=tf.data.AUTOTUNE)
-
-        ds = ds.prefetch(tf.data.AUTOTUNE)
-        return ds
-
+    def create_dataset(input_ids, attention_mask):
+        dummy_targets = tf.zeros((input_ids.shape[0], 768), dtype=tf.float32)
+        ds = tf.data.Dataset.from_tensor_slices((
+            {"input_ids": input_ids, "attention_mask": attention_mask},
+            dummy_targets
+        ))
+        return ds.shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
 
     train_ds = create_dataset(train_ids, train_mask)
@@ -108,7 +98,7 @@ def train_and_upload_to_s3_rca_model():
         save_best_only=True,
         monitor="val_loss",
         mode="min",
-        verbose=1,
+        verbose=0,
         save_format="tf"
     )
     early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
@@ -119,10 +109,11 @@ def train_and_upload_to_s3_rca_model():
             train_ds,
             validation_data=val_ds,
             epochs=EPOCHS,
-            callbacks=[checkpoint_cb,early_stop]
+            callbacks=[checkpoint_cb,early_stop],
+             verbose=2
         )
 
-        #mlflow.log_param("model_name", MODEL_NAME)
+        mlflow.log_param("model_name", MODEL_NAME)
         mlflow.log_param("epochs", EPOCHS)
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_param("max_len", MAX_LEN)
