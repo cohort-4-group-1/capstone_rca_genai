@@ -1,4 +1,4 @@
-from transformers import BertTokenizer, TFBertModel
+from transformers import DistilBertTokenizer, TFDistilBertModel
 import tensorflow as tf
 import pandas as pd
 import mlflow
@@ -19,7 +19,7 @@ S3_KEY = configuration.MODEL_OUTPUT
 
 
 # Constants
-MODEL_NAME = "bert-base-uncased"
+MODEL_NAME = "distilbert-base-uncased"
 EPOCHS = 1
 BATCH_SIZE = 64
 MAX_LEN = 64
@@ -27,7 +27,7 @@ LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 CHECKPOINT_DIR = "rca_logbert_model"
 
-def train_and_upload_to_s3_rca_model():
+def train_and_upload_to_s3_rca_model_distilbert():
     print ("set XLA and floating point")
     tf.config.optimizer.set_jit(True)  # Enable XLA
     tf.keras.mixed_precision.set_global_policy("float32")
@@ -38,8 +38,8 @@ def train_and_upload_to_s3_rca_model():
     mlflow.tensorflow.autolog(log_models=True)
 
     print ("Download token and model")
-    tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
-    bert_model = TFBertModel.from_pretrained(MODEL_NAME)
+    bert_model = TFDistilBertModel.from_pretrained(MODEL_NAME)
+    tokenizer = DistilBertTokenizer.from_pretrained(MODEL_NAME)
 
     print ("Read dataset")
     df = pd.read_csv(DATA_PATH)
@@ -69,7 +69,8 @@ def train_and_upload_to_s3_rca_model():
     bert_output = bert_model(input_ids=input_ids_in, attention_mask=attention_mask_in)
     cls_token = bert_output.last_hidden_state[:, 0, :]
     encoded = tf.keras.layers.Dense(768, activation="relu")(cls_token)
-    reconstructed = tf.keras.layers.Dense(768)(encoded)  
+    reconstructed = tf.keras.layers.Dense(768)(encoded )
+                                                
 
     model = tf.keras.Model(inputs=[input_ids_in, attention_mask_in], outputs=reconstructed)
     print ("compile model")
@@ -98,7 +99,6 @@ def train_and_upload_to_s3_rca_model():
         return ds.shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
 
-
     train_ds = create_dataset(train_ids, train_mask)
     val_ds = create_dataset(val_ids, val_mask)
     print ("checkpoint_cb set")
@@ -113,7 +113,8 @@ def train_and_upload_to_s3_rca_model():
     early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
 
     print ("strat training for  model")
-    with mlflow.start_run():           
+    with mlflow.start_run():  
+        mlflow.tensorflow.autolog()         
         model.fit(
             train_ds,
             validation_data=val_ds,
@@ -171,13 +172,13 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id='rca_anamoly_logbert_model_train',
+    dag_id='rca_anamoly_logbert_model_train_distilbert"',
     start_date=start_date_utc,
     schedule_interval="@daily",
     catchup=False,
     tags=['logbert', 'mlflow', 'tensorflow']
 ) as dag:
     training_task = PythonOperator(
-        task_id="train_and_upload_to_s3_rca_model",
-        python_callable=train_and_upload_to_s3_rca_model
+        task_id="train_and_upload_to_s3_rca_model_distilbert",
+        python_callable=train_and_upload_to_s3_rca_model_distilbert
     )
