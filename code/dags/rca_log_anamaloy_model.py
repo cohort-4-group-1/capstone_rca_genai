@@ -12,6 +12,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta, timezone
 import shutil
+import time
 
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
 S3_BUCKET = configuration.DEST_BUCKET
@@ -113,7 +114,8 @@ def train_and_upload_to_s3_rca_model():
     early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
 
     print ("strat training for  model")
-    with mlflow.start_run():           
+    with mlflow.start_run():  
+        start = time.time()         
         model.fit(
             train_ds,
             validation_data=val_ds,
@@ -121,7 +123,7 @@ def train_and_upload_to_s3_rca_model():
             callbacks=[checkpoint_cb,early_stop],
              verbose=2
         )
-
+        print("⏱ Training time:", time.time() - start, "seconds")
         mlflow.log_param("model_name", MODEL_NAME)
         mlflow.log_param("epochs", EPOCHS)
         mlflow.log_param("batch_size", BATCH_SIZE)
