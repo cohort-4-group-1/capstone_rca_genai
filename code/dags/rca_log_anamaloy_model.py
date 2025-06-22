@@ -78,6 +78,8 @@ def train_and_upload_to_s3_rca_model():
     )
 
     # Build datasets
+    print ("Build datasets")
+
     def create_dataset(ids, masks):
         ds = tf.data.Dataset.from_tensor_slices((
             {"input_ids": ids, "attention_mask": masks},
@@ -87,7 +89,7 @@ def train_and_upload_to_s3_rca_model():
 
     train_ds = create_dataset(train_ids, train_mask)
     val_ds = create_dataset(val_ids, val_mask)
-
+    print ("checkpoint_cb set")
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
         filepath=CHECKPOINT_DIR,
         save_best_only=True,
