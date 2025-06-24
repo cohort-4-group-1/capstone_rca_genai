@@ -14,8 +14,8 @@ dags:
 
 workers:
   hpa:
-    enabled: true
-    minReplicaCount: 1
+    enabled: false
+    minReplicaCount: 2
     maxReplicaCount: 5
     metrics:
       - type: Resource
@@ -23,7 +23,12 @@ workers:
           name: memory
           target:
             type: Utilization
-            averageUtilization: 80
+            averageUtilization: 80      
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 80      
   serviceAccount:      
         # Specifies whether a ServiceAccount should be created
         create: true
@@ -33,7 +38,7 @@ workers:
 
         # Annotations to add to worker kubernetes service account.
         annotations:
-          eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-s3-access  
+          eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-s3-access          
 webserver:
   serviceAccount:      
       # Specifies whether a ServiceAccount should be created

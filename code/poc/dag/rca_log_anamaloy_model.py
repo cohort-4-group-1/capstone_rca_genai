@@ -22,7 +22,7 @@ S3_KEY = configuration.MODEL_OUTPUT
 # Constants
 MODEL_NAME = "bert-base-uncased"
 EPOCHS = 1
-BATCH_SIZE = 64
+BATCH_SIZE = 16
 MAX_LEN = 64
 LEARNING_RATE = 2e-5
 DATA_PATH = f"s3://{configuration.DEST_BUCKET}/{configuration.LOG_SEQUENCE__FILE_KEY}"
@@ -71,8 +71,8 @@ def train_and_upload_to_s3_rca_model():
     cls_token = bert_output.last_hidden_state[:, 0, :]
     encoded = tf.keras.layers.Dense(768, activation="relu")(cls_token)
     reconstructed = tf.keras.layers.Dense(768)(encoded)  
-
     model = tf.keras.Model(inputs=[input_ids_in, attention_mask_in], outputs=reconstructed)
+    
     print ("compile model")
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
