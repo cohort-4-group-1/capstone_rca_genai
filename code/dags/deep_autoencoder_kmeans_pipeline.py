@@ -29,7 +29,7 @@ BATCH_SIZE = 64
 
 
 # --- Autoencoder Architecture ---
-def train_rca_model_deep_network_kmeans(input_dim, latent_dim):
+def build_autoencoder(input_dim, latent_dim):
     input_layer = layers.Input(shape=(input_dim,))
     x = layers.Dense(512, activation='relu')(input_layer)
     x = layers.Dense(128, activation='relu')(x)
@@ -112,14 +112,14 @@ now = datetime.now(timezone.utc)
 start_time = now.replace(minute=(now.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id="train_rca_model_deep_network_kmeans",
+    dag_id="train_autoencoder_kmeans_pipeline",
     start_date=start_time,
     schedule_interval="@daily",
     catchup=False,
     tags=["log-anomaly", "deep-neural", "kmeans", "mlflow"],
 ) as dag:
     train_task = PythonOperator(
-        task_id="train_rca_model_deep_network_kmeans",
-        python_callable=train_rca_model_deep_network_kmeans
+        task_id="train_autoencoder_kmeans_pipeline",
+        python_callable=train_autoencoder_kmeans_pipeline
     )
 
