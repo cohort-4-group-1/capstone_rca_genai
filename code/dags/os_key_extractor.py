@@ -224,7 +224,7 @@ class OpenStackLogParser:
             for event_id, count in sorted(event_counts.items()):
                 print(f"{event_id}: {count} occurrences")
 
-def main():
+def extract_keys():
     # File paths - modify these according to your file locations
     SOURCE_BUCKET = 'rca.logs.openstack'
     DEST_BUCKET = 'rca.logs.openstack'
@@ -317,4 +317,4 @@ if __name__ == "__main__":
         print("Files in directory:", os.listdir('.'))
         print("=" * 30)
     
-    main()
+    extract_keys()
