@@ -14,6 +14,7 @@ from sklearn.metrics import silhouette_score
 from collections import Counter
 from datetime import datetime
 import configuration
+import matplotlib.pyplot as plt
 
 # --- Configuration ---
 S3_BUCKET = configuration.DEST_BUCKET
@@ -43,6 +44,19 @@ def build_autoencoder(input_dim, latent_dim):
     autoencoder.compile(optimizer='adam', loss='mse')
     return autoencoder, encoder
 
+
+def plot_training_curves(history, output_path):
+    plt.figure(figsize=(8, 5))
+    plt.plot(history.history['loss'], label='Train Loss')
+    if 'val_loss' in history.history:
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training Curve")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(output_path)
+    plt.close()
 
 def train_autoencoder_kmeans_pipeline():
     print("🚀 Starting autoencoder + KMeans pipeline")
@@ -89,7 +103,8 @@ def train_autoencoder_kmeans_pipeline():
     s3_model_key_versioned = f"{S3_MODEL_KEY}_{timestamp}.pkl"
     s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, s3_model_key_versioned)
     print(f"☁️ Model uploaded to s3://{S3_BUCKET}/{s3_model_key_versioned}")
-
+    curve_path = "/tmp/loss_curve.png"
+    plot_training_curves(history, curve_path)
     print("📦 Logging model and metrics to MLflow")
     with mlflow.start_run():
         mlflow.log_param("latent_dim", LATENT_DIM)
@@ -98,11 +113,18 @@ def train_autoencoder_kmeans_pipeline():
         mlflow.log_param("epochs", EPOCHS)
         mlflow.log_param("batch_size", BATCH_SIZE)
         mlflow.log_metric("silhouette_score", silhouette)
+        for i, loss in enumerate(history.history['loss']):
+            mlflow.log_metric("train_loss", loss, step=i)
+
+        if 'val_loss' in history.history:
+            for i, val_loss in enumerate(history.history['val_loss']):
+                mlflow.log_metric("val_loss", val_loss, step=i)
 
         for cluster_id, count in Counter(cluster_labels).items():
             mlflow.log_metric(f"cluster_{cluster_id}_count", count)
 
         mlflow.log_artifact(LOCAL_MODEL_PATH)
+        mlflow.log_artifact(curve_path)
         mlflow.set_tag("s3_model_path", f"s3://{S3_BUCKET}/{s3_model_key_versioned}")
 
     print("✅ Training complete")
