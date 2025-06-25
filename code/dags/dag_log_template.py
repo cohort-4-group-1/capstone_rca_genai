@@ -7,6 +7,7 @@ import boto3
 import configuration
 from io import StringIO
 import pandas as pd
+import os
 
 
 
@@ -72,7 +73,36 @@ def convert_template_from_structured_log():
     if not templates_df.empty:
       upload_templates_to_s3(templates_df)
       append_log_key_to_structured_log()
-      
+
+   # After s3 upload
+    if os.path.exists(configuration.TEMPLATE_DRAIN_FILE):
+        os.remove(configuration.TEMPLATE_DRAIN_FILE)
+        print(f"Deleted local template file: {configuration.TEMPLATE_DRAIN_FILE}")
+    else:
+        print(f"File not found for deletion: {configuration.TEMPLATE_DRAIN_FILE}")
+
+       # After s3 upload
+    if os.path.exists(configuration.TEMPLATE_DRAIN_FILE):
+        os.remove(configuration.TEMPLATE_DRAIN_FILE)
+        print(f"Deleted local drain template file: {configuration.TEMPLATE_DRAIN_FILE}")
+    else:
+        print(f"File not found for deletion: {configuration.TEMPLATE_DRAIN_FILE}")    
+
+# After s3 upload
+if os.path.exists(configuration.TEMPLATE_FILE_KEY):
+    os.remove(configuration.TEMPLATE_FILE_KEY)
+    print(f"Deleted local template file: {configuration.TEMPLATE_FILE_KEY}")
+else:
+    print(f"File not found for deletion: {configuration.TEMPLATE_FILE_KEY}")
+
+
+# After s3 upload
+if os.path.exists(configuration.TEMPLATE_DRAIN_FILE):
+    os.remove(configuration.TEMPLATE_DRAIN_FILE)
+    print(f"✅ Deleted local template file: {configuration.TEMPLATE_DRAIN_FILE}")
+else:
+    print(f"⚠️ File not found for deletion: {configuration.TEMPLATE_DRAIN_FILE}")
+  
 
 def append_log_key_to_structured_log():
     print("📥 Reading structured logs and templates from S3...")

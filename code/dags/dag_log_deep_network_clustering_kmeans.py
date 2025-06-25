@@ -139,7 +139,7 @@ with DAG(
     tags=["log-anomaly", "deep-neural", "kmeans", "mlflow"],
 ) as dag:
     train_task = PythonOperator(
-        task_id="train_autoencoder_kmeans_pipeline",
+        task_id="train_rca_model_deep_network_clustering_kmeans",
         python_callable=train_autoencoder_kmeans_pipeline
     )
 

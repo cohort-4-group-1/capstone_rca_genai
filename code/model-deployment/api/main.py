@@ -24,7 +24,7 @@ app = FastAPI()
 # --- Globals ---
 S3_BUCKET = configuration.DEST_BUCKET
 S3_MODEL_KEY = configuration.CLUSTERING_MODEL_OUTPUT  # Joblib: vectorizer, encoder, kmeans
-S3_TEMPLATE_KEY = configuration.DRAIN3_TEMPLATE_FILE  # Drain3 template state file
+S3_TEMPLATE_KEY = configuration.TEMPLATE_DRAIN_FILE  # Drain3 template state file
 LOCAL_TEMPLATE_PATH = "/tmp/drain3_state.bin"
 MODEL = None
 TEMPLATE_MINER = None
