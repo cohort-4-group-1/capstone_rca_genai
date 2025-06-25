@@ -93,16 +93,14 @@ def train_autoencoder_kmeans_pipeline():
     kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42, n_init="auto")
     cluster_labels = kmeans.fit_predict(latent_vectors)
     silhouette = silhouette_score(latent_vectors, cluster_labels)
-    print(f"📈 Silhouette score: {silhouette:.4f}")
+    print(f"Silhouette score: {silhouette:.4f}")
 
     # Save model artifacts
     joblib.dump((vectorizer, encoder, kmeans), LOCAL_MODEL_PATH)
 
     # Upload model to S3 with versioning
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    s3_model_key_versioned = f"{S3_MODEL_KEY}_{timestamp}.pkl"
-    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, s3_model_key_versioned)
-    print(f"☁️ Model uploaded to s3://{S3_BUCKET}/{s3_model_key_versioned}")
+    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, S3_MODEL_KEY)
+    print(f"☁️ Model uploaded to s3://{S3_BUCKET}/{S3_MODEL_KEY}")
     curve_path = "/tmp/loss_curve.png"
     plot_training_curves(history, curve_path)
     print("📦 Logging model and metrics to MLflow")
@@ -125,7 +123,7 @@ def train_autoencoder_kmeans_pipeline():
 
         mlflow.log_artifact(LOCAL_MODEL_PATH)
         mlflow.log_artifact(curve_path)
-        mlflow.set_tag("s3_model_path", f"s3://{S3_BUCKET}/{s3_model_key_versioned}")
+        mlflow.set_tag("s3_model_path", f"s3://{S3_BUCKET}/{S3_MODEL_KEY}")
 
     print("✅ Training complete")
 
@@ -134,7 +132,7 @@ now = datetime.now(timezone.utc)
 start_time = now.replace(minute=(now.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id="train_autoencoder_kmeans_pipeline",
+    dag_id="dag_log_deep_network_clustering_kmeans",
     start_date=start_time,
     schedule_interval="@daily",
     catchup=False,

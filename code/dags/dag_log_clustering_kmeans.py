@@ -5,7 +5,6 @@ import pandas as pd
 import boto3
 import mlflow
 import joblib
-import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
@@ -75,7 +74,7 @@ def train_rca_model_clustering_kmeans():
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     versioned_path = f"{configuration.CLUSTERING_MODEL_OUTPUT}_{timestamp}.pkl"    
     # Upload to S3
-    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, versioned_path)
+    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, configuration.CLUSTERING_MODEL_OUTPUT)
 
     print(f"started to track the model in mlflow")
     # Predict cluster labels with best model
@@ -101,7 +100,7 @@ now = datetime.now(timezone.utc)
 start_time = now.replace(minute=(now.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id="rca_log_clustering_kmeans_model_dag",
+    dag_id="dag_log_clustering_kmeans",
     start_date=start_time,
     schedule_interval="@daily",
     catchup=False,

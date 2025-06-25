@@ -18,7 +18,8 @@ def read_raw_log_from_datalake(**kwargs):
     # Push raw log text via XCom
     kwargs['ti'].xcom_push(key='raw_log_text', value=log_text)
 
-def convert_raw_log_to_csv(**kwargs):
+def convert_raw_log_to_csv(kwargs):
+    read_raw_log_from_datalake(**kwargs)
     raw_log = kwargs['ti'].xcom_pull(task_ids='read_log_from_raw_datalake', key='raw_log_text')
     
     pattern = re.compile(
@@ -45,8 +46,9 @@ def convert_raw_log_to_csv(**kwargs):
 
     kwargs['ti'].xcom_push(key='parsed_log_csv', value=csv_string)
     print("CSV conversion complete.")
+    upload_csv_to_silver_datalake()
 
-def upload_csv_to_silver_datalake(**kwargs):
+def upload_csv_to_silver_datalake(kwargs):
     csv_data = kwargs['ti'].xcom_pull(task_ids='convert_raw_log_to_csv', key='parsed_log_csv')
     
     s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
@@ -62,26 +64,15 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id='Step_1_rca_raw_log_parser',
+    dag_id='dag_log_parse',
     start_date=start_date_utc,
     schedule_interval="*/30 * * * *",
     catchup=False,
     tags=['s3', 'validation', 'etl'],
 ) as dag:
 
-    t1 = PythonOperator(
-        task_id='read_log_from_raw_datalake',
-        python_callable=read_raw_log_from_datalake
-    )
-
-    t2 = PythonOperator(
-        task_id='convert_raw_log_to_csv',
+    parse_raw_log = PythonOperator(
+        task_id='parse_convert_raw_log_to_structured',
         python_callable=convert_raw_log_to_csv
     )
-
-    t3 = PythonOperator(
-        task_id='upload_csv_to_silver_datalake',
-        python_callable=upload_csv_to_silver_datalake
-    )
-
-    t1 >> t2 >> t3
+    parse_raw_log
