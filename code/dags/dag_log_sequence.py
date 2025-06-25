@@ -29,18 +29,18 @@ def generate_log_sequence():
     s3.put_object(Bucket=bucket, Key=configuration.LOG_SEQUENCE__FILE_KEY, Body=csv_buffer.getvalue())
     print("✅ LogBERT input saved to S3: gold/logbert_template_text_input.csv")
 
-    # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
-    now_utc = datetime.now(timezone.utc)
-    start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
-    with DAG(
-        dag_id='dag_log_sequence',
-        start_date=start_date_utc,
-        schedule_interval="*/30 * * * *",
-        catchup=False,
-        tags=['s3', 'log_template', 'log_sequence'],
-    ) as dag:
-        generate_log_sequence = PythonOperator(
-            task_id='generate_log_sequence',
-            python_callable=generate_log_sequence
-        )
-        generate_log_sequence
+# DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
+now_utc = datetime.now(timezone.utc)
+start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
+with DAG(
+    dag_id='dag_log_sequence',
+    start_date=start_date_utc,
+    schedule_interval="*/30 * * * *",
+    catchup=False,
+    tags=['s3', 'log_template', 'log_sequence'],
+) as dag:
+    generate_log_sequence = PythonOperator(
+        task_id='generate_log_sequence',
+        python_callable=generate_log_sequence
+    )
+    generate_log_sequence
