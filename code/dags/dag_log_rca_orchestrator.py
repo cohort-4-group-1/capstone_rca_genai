@@ -3,6 +3,7 @@ from airflow import DAG
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sensors.external_task import ExternalTaskSensor
 from datetime import datetime
+from airflow.utils.dates import days_ago
 
 with DAG(
     dag_id="dag_log_rca_orchestrator",
@@ -20,6 +21,7 @@ with DAG(
     dag_log_template = TriggerDagRunOperator(
         task_id="generate_template",
         trigger_dag_id="dag_log_template"
+        
     )
 
     wait_for_template = ExternalTaskSensor(
@@ -29,8 +31,9 @@ with DAG(
         allowed_states=["success"],
         timeout=600,
         poke_interval=30,
-        mode="poke"
-    )
+        mode="poke",
+        execution_date_fn=lambda context: context["execution_date"]
+    )   
 
     dag_log_sequence = TriggerDagRunOperator(
         task_id="generate_log_sequence",
