@@ -5,6 +5,9 @@ from drain3 import TemplateMiner
 from drain3.file_persistence import FilePersistence
 import boto3
 import configuration
+from io import StringIO
+import pandas as pd
+
 
 
 def read_structured_log_from_datalake():
