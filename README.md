@@ -82,7 +82,7 @@ terraform state list
 terraform state show <resource_name>
 terraform state show aws_s3_bucket.my_bucket
 
-terraform destroy 
+terraform destroy --auto-approve
 
 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
 
