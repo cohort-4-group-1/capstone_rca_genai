@@ -4,6 +4,10 @@ from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sensors.external_task import ExternalTaskSensor
 from datetime import datetime
 from airflow.utils.dates import days_ago
+from airflow.utils.context import Context
+
+def get_current_execution_date(**kwargs: Context):
+    return kwargs["execution_date"]
 
 with DAG(
     dag_id="dag_log_rca_orchestrator",
@@ -32,8 +36,8 @@ with DAG(
         timeout=600,
         poke_interval=30,
         mode="poke",
-        execution_date_fn=lambda context: context["execution_date"]
-    )   
+        execution_date_fn=get_current_execution_date
+    ) 
 
     dag_log_sequence = TriggerDagRunOperator(
         task_id="generate_log_sequence",
