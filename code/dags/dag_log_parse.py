@@ -36,14 +36,10 @@ def convert_raw_log_to_csv(**kwargs):
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
     csv_string = csv_buffer.getvalue()
-
-    kwargs['ti'].xcom_push(key='parsed_log_csv', value=csv_string)
     print("CSV conversion complete.")
-    upload_csv_to_silver_datalake()
+    upload_csv_to_silver_datalake(csv_string)
 
-def upload_csv_to_silver_datalake(kwargs):
-    csv_data = kwargs['ti'].xcom_pull(task_ids='convert_raw_log_to_csv', key='parsed_log_csv')
-    
+def upload_csv_to_silver_datalake(csv_data):    
     s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
     s3.put_object(
         Bucket=configuration.DEST_BUCKET,
