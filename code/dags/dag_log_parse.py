@@ -18,7 +18,7 @@ def read_raw_log_from_datalake(**kwargs):
     # Push raw log text via XCom
     kwargs['ti'].xcom_push(key='raw_log_text', value=log_text)
 
-def convert_raw_log_to_csv(kwargs):
+def convert_raw_log_to_csv(**kwargs):
     read_raw_log_from_datalake(**kwargs)
     raw_log = kwargs['ti'].xcom_pull(task_ids='read_log_from_raw_datalake', key='raw_log_text')
     
