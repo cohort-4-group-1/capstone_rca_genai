@@ -6,8 +6,8 @@ from datetime import datetime
 from airflow.utils.dates import days_ago
 from airflow.utils.context import Context
 
-def get_current_execution_date(**kwargs: Context):
-    return kwargs["execution_date"]
+def get_current_execution_date(execution_date, **kwargs):
+    return execution_date
 
 with DAG(
     dag_id="dag_log_rca_orchestrator",
