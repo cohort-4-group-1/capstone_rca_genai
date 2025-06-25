@@ -7,20 +7,13 @@ import boto3
 import re
 import configuration  
 
-def read_raw_log_from_datalake(**kwargs):
+def convert_raw_log_to_csv(**kwargs):
     print(f"Reading file from S3: {configuration.SOURCE_BUCKET}/{configuration.RAW_FILE_KEY}")
     s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
     obj = s3.get_object(Bucket=configuration.SOURCE_BUCKET, Key=configuration.RAW_FILE_KEY)
     
-    log_text = obj['Body'].read().decode('utf-8')
-    print("Successfully read log file from S3")
-    
-    # Push raw log text via XCom
-    kwargs['ti'].xcom_push(key='raw_log_text', value=log_text)
-
-def convert_raw_log_to_csv(**kwargs):
-    read_raw_log_from_datalake(**kwargs)
-    raw_log = kwargs['ti'].xcom_pull(task_ids='read_log_from_raw_datalake', key='raw_log_text')
+    raw_log = obj['Body'].read().decode('utf-8')
+    print("Successfully read log file from S3")   
     
     pattern = re.compile(
         r'(?P<source>[^\s]+)\s+'
