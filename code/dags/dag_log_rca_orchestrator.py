@@ -28,17 +28,6 @@ with DAG(
         
     )
 
-    wait_for_template = ExternalTaskSensor(
-        task_id="wait_for_template_completion",
-        external_dag_id="dag_log_template",
-        external_task_id="generate_template",
-        allowed_states=["success"],
-        timeout=600,
-        poke_interval=30,
-        mode="poke",
-        execution_date_fn=get_current_execution_date
-    ) 
-
     dag_log_sequence = TriggerDagRunOperator(
         task_id="generate_log_sequence",
         trigger_dag_id="dag_log_sequence"
