@@ -134,7 +134,7 @@ def perform_dask_eda_and_save_to_s3(**kwargs):
 now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 with DAG(
-    dag_id='Step_2_rca_structured_log_eda',
+    dag_id='dag_log_eda',
     start_date=start_date_utc,
     schedule_interval="*/30 * * * *",
     catchup=False,

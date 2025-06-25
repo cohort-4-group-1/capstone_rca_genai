@@ -1,9 +1,14 @@
-import pandas as pd
-import configuration
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime
 from drain3 import TemplateMiner
 from drain3.file_persistence import FilePersistence
 import boto3
+import configuration
 from io import StringIO
+import pandas as pd
+import os
+
 
 
 def read_structured_log_from_datalake():
@@ -21,13 +26,18 @@ def upload_templates_to_s3(df):
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
 
-    s3_client = boto3.client("s3")
+    s3_client = boto3.client("s3")    
     s3_client.put_object(
         Bucket=configuration.DEST_BUCKET,
         Key=configuration.TEMPLATE_FILE_KEY,
-        Body=csv_buffer.getvalue()
+        Body=csv_buffer.getvalue()      
     )
-    print(f"✅ Uploaded to s3://{configuration.DEST_BUCKET}/{configuration.TEMPLATE_FILE_KEY}")
+
+    s3_client.upload_file(
+        configuration.TEMPLATE_DRAIN_FILE,
+        configuration.DEST_BUCKET,
+        configuration.TEMPLATE_DRAIN_FILE_KEY        
+    )
 
 
 def convert_template_from_structured_log():
@@ -41,7 +51,7 @@ def convert_template_from_structured_log():
         print("No log messages to process.")
         return
 
-    persistence = FilePersistence("log_template_state.json")
+    persistence = FilePersistence(configuration.TEMPLATE_DRAIN_FILE)
     template_miner = TemplateMiner(persistence, config=None)
 
     templates_set = set()
@@ -62,6 +72,37 @@ def convert_template_from_structured_log():
     print(templates_df.head())
     if not templates_df.empty:
       upload_templates_to_s3(templates_df)
+      append_log_key_to_structured_log()
+
+   # After s3 upload
+    if os.path.exists(configuration.TEMPLATE_DRAIN_FILE):
+        os.remove(configuration.TEMPLATE_DRAIN_FILE)
+        print(f"Deleted local template file: {configuration.TEMPLATE_DRAIN_FILE}")
+    else:
+        print(f"File not found for deletion: {configuration.TEMPLATE_DRAIN_FILE}")
+
+       # After s3 upload
+    if os.path.exists(configuration.TEMPLATE_DRAIN_FILE):
+        os.remove(configuration.TEMPLATE_DRAIN_FILE)
+        print(f"Deleted local drain template file: {configuration.TEMPLATE_DRAIN_FILE}")
+    else:
+        print(f"File not found for deletion: {configuration.TEMPLATE_DRAIN_FILE}")    
+
+# After s3 upload
+if os.path.exists(configuration.TEMPLATE_FILE_KEY):
+    os.remove(configuration.TEMPLATE_FILE_KEY)
+    print(f"Deleted local template file: {configuration.TEMPLATE_FILE_KEY}")
+else:
+    print(f"File not found for deletion: {configuration.TEMPLATE_FILE_KEY}")
+
+
+# After s3 upload
+if os.path.exists(configuration.TEMPLATE_DRAIN_FILE):
+    os.remove(configuration.TEMPLATE_DRAIN_FILE)
+    print(f"✅ Deleted local template file: {configuration.TEMPLATE_DRAIN_FILE}")
+else:
+    print(f"⚠️ File not found for deletion: {configuration.TEMPLATE_DRAIN_FILE}")
+  
 
 def append_log_key_to_structured_log():
     print("📥 Reading structured logs and templates from S3...")
@@ -112,5 +153,23 @@ def append_log_key_to_structured_log():
 
     print(f"✅ Enriched structured log uploaded to s3://{configuration.DEST_BUCKET}/{enriched_key}")
 
-convert_template_from_structured_log()
-append_log_key_to_structured_log()
+default_args = {
+    'start_date': datetime(2024, 1, 1),
+    'retries': 0
+}
+
+with DAG(
+    dag_id="dag_log_template",
+    schedule_interval=None,
+    default_args=default_args,
+    catchup=False,
+    tags=["drain3", "log-parsing", "rca"],
+    description="Extracts templates from structured logs and appends log key references"
+) as dag:
+
+    generate_templates = PythonOperator(
+        task_id="generate_template",
+        python_callable=convert_template_from_structured_log
+    )      
+
+    generate_templates 

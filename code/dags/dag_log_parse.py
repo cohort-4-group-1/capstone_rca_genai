@@ -7,19 +7,13 @@ import boto3
 import re
 import configuration  
 
-def read_raw_log_from_datalake(**kwargs):
+def convert_raw_log_to_csv(**kwargs):
     print(f"Reading file from S3: {configuration.SOURCE_BUCKET}/{configuration.RAW_FILE_KEY}")
     s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
     obj = s3.get_object(Bucket=configuration.SOURCE_BUCKET, Key=configuration.RAW_FILE_KEY)
     
-    log_text = obj['Body'].read().decode('utf-8')
-    print("Successfully read log file from S3")
-    
-    # Push raw log text via XCom
-    kwargs['ti'].xcom_push(key='raw_log_text', value=log_text)
-
-def convert_raw_log_to_csv(**kwargs):
-    raw_log = kwargs['ti'].xcom_pull(task_ids='read_log_from_raw_datalake', key='raw_log_text')
+    raw_log = obj['Body'].read().decode('utf-8')
+    print("Successfully read log file from S3")   
     
     pattern = re.compile(
         r'(?P<source>[^\s]+)\s+'
@@ -42,13 +36,10 @@ def convert_raw_log_to_csv(**kwargs):
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
     csv_string = csv_buffer.getvalue()
-
-    kwargs['ti'].xcom_push(key='parsed_log_csv', value=csv_string)
     print("CSV conversion complete.")
+    upload_csv_to_silver_datalake(csv_string)
 
-def upload_csv_to_silver_datalake(**kwargs):
-    csv_data = kwargs['ti'].xcom_pull(task_ids='convert_raw_log_to_csv', key='parsed_log_csv')
-    
+def upload_csv_to_silver_datalake(csv_data):    
     s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
     s3.put_object(
         Bucket=configuration.DEST_BUCKET,
@@ -62,26 +53,15 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 
 with DAG(
-    dag_id='Step_1_rca_raw_log_parser',
+    dag_id='dag_log_parse',
     start_date=start_date_utc,
     schedule_interval="*/30 * * * *",
     catchup=False,
     tags=['s3', 'validation', 'etl'],
 ) as dag:
 
-    t1 = PythonOperator(
-        task_id='read_log_from_raw_datalake',
-        python_callable=read_raw_log_from_datalake
-    )
-
-    t2 = PythonOperator(
-        task_id='convert_raw_log_to_csv',
+    parse_raw_log = PythonOperator(
+        task_id='parse_convert_raw_log_to_structured',
         python_callable=convert_raw_log_to_csv
     )
-
-    t3 = PythonOperator(
-        task_id='upload_csv_to_silver_datalake',
-        python_callable=upload_csv_to_silver_datalake
-    )
-
-    t1 >> t2 >> t3
+    parse_raw_log
