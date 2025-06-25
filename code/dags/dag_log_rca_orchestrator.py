@@ -43,6 +43,4 @@ with DAG(
         trigger_dag_id="dag_log_deep_network_clustering_kmeans"
     )
 
-    dag_log_parse >> dag_log_template
-    #dag_log_template >> wait_for_template >> dag_log_sequence
-    dag_log_sequence >> [dag_log_clustering_kmeans, dag_log_deep_network_clustering_kmeans]
+    dag_log_parse >> dag_log_template >> dag_log_sequence >>  [dag_log_clustering_kmeans, dag_log_deep_network_clustering_kmeans]
