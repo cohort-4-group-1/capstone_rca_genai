@@ -23,7 +23,9 @@ app = FastAPI()
 
 # --- Globals ---
 S3_BUCKET = configuration.DEST_BUCKET
-S3_MODEL_KEY = configuration.CLUSTERING_MODEL_OUTPUT  # Joblib: vectorizer, encoder, kmeans
+MODEL_ENV_PATH = os.environ.get("LOGBERT_MODEL_PATH")
+S3_MODEL_KEY = MODEL_ENV_PATH if MODEL_ENV_PATH else configuration.CLUSTERING_MODEL_OUTPUT
+#S3_MODEL_KEY = configuration.CLUSTERING_MODEL_OUTPUT  # Joblib: vectorizer, encoder, kmeans
 S3_TEMPLATE_KEY = configuration.TEMPLATE_DRAIN_FILE  # Drain3 template state file
 LOCAL_TEMPLATE_PATH = "/tmp/drain3_state.bin"
 MODEL = None
