@@ -16,6 +16,7 @@ from datetime import datetime
 import configuration
 import matplotlib.pyplot as plt
 
+print(f"Tensor flow version: {tf.__version__}")
 # --- Configuration ---
 S3_BUCKET = configuration.DEST_BUCKET
 S3_KEY = configuration.LOG_SEQUENCE__FILE_KEY
