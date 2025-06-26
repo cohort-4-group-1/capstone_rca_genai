@@ -16,7 +16,7 @@ from datetime import datetime
 import configuration
 import matplotlib.pyplot as plt
 
-print(f"Tensor flow version: {tf.__version__}")
+
 # --- Configuration ---
 S3_BUCKET = configuration.DEST_BUCKET
 S3_KEY = configuration.LOG_SEQUENCE__FILE_KEY
@@ -61,7 +61,7 @@ def plot_training_curves(history, output_path):
 
 def train_autoencoder_kmeans_pipeline():
     print("🚀 Starting autoencoder + KMeans pipeline")
-
+    print(f"Tensor flow version: {tf.__version__}")
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment("openstack-log-anomaly-deep")
 
