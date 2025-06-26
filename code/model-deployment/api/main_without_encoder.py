@@ -37,7 +37,7 @@ def load_resources():
     # Load model from S3
     s3 = boto3.client("s3")
     print("Loading model from S3...")
-    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.pkl")
+    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.CLUSTERING_MODEL_OUTPUT}")
     vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))
     
     print("📥 Downloading best encoder model...")
