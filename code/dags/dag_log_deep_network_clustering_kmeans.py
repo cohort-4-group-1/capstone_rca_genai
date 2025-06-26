@@ -96,7 +96,7 @@ def train_autoencoder_kmeans_pipeline():
     print(f"Silhouette score: {silhouette:.4f}")
 
     encoder_path = "/tmp/encoder_model.keras"
-    encoder.save(encoder_path)
+    encoder.save(encoder_path, save_format="keras")
     joblib.dump((vectorizer,kmeans), LOCAL_MODEL_PATH)
 
     s3.upload_file(encoder_path, S3_BUCKET, f"{S3_MODEL_KEY}.encoder.keras")
