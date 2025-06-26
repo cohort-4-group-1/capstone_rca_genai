@@ -1,0 +1,10 @@
+fastapi 
+uvicorn
+boto3 
+joblib
+pandas
+scikit-learn
+tensorflow
+drain3
+python-multipart
+dill

@@ -70,11 +70,11 @@ def train_autoencoder_kmeans_pipeline():
     df = pd.read_csv(io.BytesIO(response['Body'].read()))
     sequences = df["sequence"].astype(str).tolist()
 
-    print("🔠 Converting logs to TF-IDF vectors")
+    print("Converting logs to TF-IDF vectors")
     vectorizer = TfidfVectorizer(max_features=MAX_FEATURES)
     X = vectorizer.fit_transform(sequences).toarray()
 
-    print("🧠 Building and training autoencoder")
+    print("Building and training autoencoder")
     autoencoder, encoder = build_autoencoder(input_dim=X.shape[1], latent_dim=LATENT_DIM)
     history = autoencoder.fit(
         X, X,
@@ -95,11 +95,13 @@ def train_autoencoder_kmeans_pipeline():
     silhouette = silhouette_score(latent_vectors, cluster_labels)
     print(f"Silhouette score: {silhouette:.4f}")
 
-    # Save model artifacts
-    joblib.dump((vectorizer, encoder, kmeans), LOCAL_MODEL_PATH)
+    encoder_path = "/tmp/encoder_model.keras"
+    encoder.save(encoder_path)
+    joblib.dump((vectorizer,kmeans), LOCAL_MODEL_PATH)
 
-    # Upload model to S3 with versioning
-    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, S3_MODEL_KEY)
+    s3.upload_file(encoder_path, S3_BUCKET, f"{S3_MODEL_KEY}.encoder.keras")
+    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, f"{S3_MODEL_KEY}.pkl")
+
     print(f"☁️ Model uploaded to s3://{S3_BUCKET}/{S3_MODEL_KEY}")
     curve_path = "/tmp/loss_curve.png"
     plot_training_curves(history, curve_path)

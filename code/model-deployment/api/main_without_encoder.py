@@ -23,11 +23,9 @@ app = FastAPI()
 
 # --- Globals ---
 S3_BUCKET = configuration.DEST_BUCKET
-MODEL_ENV_PATH = os.environ.get("LOGBERT_MODEL_PATH")
-S3_MODEL_KEY = MODEL_ENV_PATH if MODEL_ENV_PATH else configuration.CLUSTERING_MODEL_OUTPUT
 #S3_MODEL_KEY = configuration.CLUSTERING_MODEL_OUTPUT  # Joblib: vectorizer, encoder, kmeans
-S3_TEMPLATE_KEY = configuration.TEMPLATE_DRAIN_FILE  # Drain3 template state file
-LOCAL_TEMPLATE_PATH = "/tmp/drain3_state.bin"
+S3_TEMPLATE_KEY = configuration.TEMPLATE_DRAIN_FILE_KEY  # Drain3 template state file
+LOCAL_TEMPLATE_PATH = configuration.TEMPLATE_DRAIN_FILE
 MODEL = None
 TEMPLATE_MINER = None
 
@@ -39,16 +37,22 @@ def load_resources():
     # Load model from S3
     s3 = boto3.client("s3")
     print("Loading model from S3...")
-    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=S3_MODEL_KEY)
-    MODEL = joblib.load(io.BytesIO(model_obj['Body'].read()))
+    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.pipeline.pkl")
+    vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))
+    
+    print("📥 Downloading best encoder model...")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".keras") as tmp_file:
+        s3.download_file(S3_BUCKET, f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.encoder.keras", tmp_file.name)
+        encoder = load_model(tmp_file.name)
+
+    MODEL = (vectorizer, encoder, kmeans)
+    print("Encoder and pipeline loaded successfully")
 
     # Load Drain3 state file from S3
     print("Loading Drain3 template from S3...")
     s3.download_file(S3_BUCKET, S3_TEMPLATE_KEY, LOCAL_TEMPLATE_PATH)
-    config = TemplateMinerConfig()
-    config.load_default()
     persistence = FilePersistence(LOCAL_TEMPLATE_PATH)
-    TEMPLATE_MINER = TemplateMiner(persistence, config)
+    TEMPLATE_MINER = TemplateMiner(persistence, config=None)
 
     print("Model and template miner loaded.")
 
@@ -84,42 +88,36 @@ def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dic
 @app.post("/analyze-log")
 def analyze_log(file: UploadFile = File(...)):
     if not MODEL:
-        raise HTTPException(status_code=500, detail="Model not loaded")
+        raise HTTPException(status_code=500, detail="Clustering model not loaded")
 
-    vectorizer, encoder, kmeans = MODEL
+    vectorizer, kmeans = MODEL
 
-    # Read uploaded log file
-    lines = [line.decode("utf-8").strip() for line in file.file.readlines() if line.strip()]
+    try:
+        # Read log lines
+        lines = [line.decode("utf-8").strip() for line in file.file.readlines() if line.strip()]
 
-    # Step 1: Parse templates
-    templates = parse_templates(lines)
+        # Create sequences
+        sequences = group_sequences(lines, window_size=10)
+        if not sequences:
+            raise HTTPException(status_code=400, detail="Not enough lines to form sequences")
 
-    # Step 2: Group into sequences
-    sequences = group_sequences(templates, window_size=10)
-    if not sequences:
-        raise HTTPException(status_code=400, detail="Not enough lines to create sequences")
+        # Vectorize
+        X = vectorizer.transform(sequences)
 
-    # Step 3: Vectorize, encode, cluster
-    X = vectorizer.transform(sequences).toarray()
-    latent = encoder.predict(X)
-    clusters = kmeans.predict(latent)
+        # Predict clusters
+        clusters = kmeans.predict(X)
 
-    # Step 4: Calculate reconstruction error as anomaly score
-    recon = encoder.model.predict(X)  # Assumes decoder is part of encoder.model
-    anomaly_scores = np.mean((X - recon)**2, axis=1)
+        # Prepare results
+        results = []
+        for i, seq in enumerate(sequences):
+            result = {
+                "window_start_line": lines[i],
+                "sequence": seq,
+                "cluster": int(clusters[i]),
+            }
+            results.append(result)
 
-    # Step 5: Map sequence result back to lines and enrich with LLM
-    results = []
-    for i, seq in enumerate(sequences):
-        context_lines = lines[i:i+10]  # context window
-        #llm_analysis = analyze_context_with_llm(anomaly_line=lines[i], context_lines=context_lines)
-        result = {
-            "log_window_start": lines[i],
-            "sequence": sequences[i],
-            "cluster": int(clusters[i]),
-            "anomaly_score": float(anomaly_scores[i])#,
-            #"context_analysis": llm_analysis
-        }
-        results.append(result)
+        return results
 
-    return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}")

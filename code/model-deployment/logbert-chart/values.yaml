@@ -2,13 +2,13 @@ global:
   region: us-east-1
   serviceAccount:
     name: logbert-s3-access
-    roleArn: arn:aws:iam::141134438799:role/<YOUR_IAM_ROLE_NAME>
+    roleArn: arn:aws:iam::141134438799:role/iisc-capstone-rca-model-s3-access
 
 api:
   image:
     repository: sujittah/logbert-api
     tag: latest
-    port: 8000
+    port: 9000
 
 ui:
   image:
