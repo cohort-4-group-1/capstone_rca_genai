@@ -37,15 +37,13 @@ def load_resources():
     # Load model from S3
     s3 = boto3.client("s3")
     print("Loading model from S3...")
-    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.pipeline.pkl")
+    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.pkl")
     vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))
     
     print("📥 Downloading best encoder model...")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".keras") as tmp_file:
-        s3.download_file(S3_BUCKET, f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.encoder.keras", tmp_file.name)
-        encoder = load_model(tmp_file.name)
 
-    MODEL = (vectorizer, encoder, kmeans)
+
+    MODEL = (vectorizer,  kmeans)
     print("Encoder and pipeline loaded successfully")
 
     # Load Drain3 state file from S3
