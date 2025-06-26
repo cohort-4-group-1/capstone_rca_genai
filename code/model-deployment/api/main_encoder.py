@@ -18,7 +18,9 @@ import tempfile
 import configuration
 import json
 import requests  # Required for invoking LLM-based context analysis
+import tensorflow as tf
 
+print(f"Tensor flow version: {tf.__version__}")
 app = FastAPI()
 
 # --- Globals ---
