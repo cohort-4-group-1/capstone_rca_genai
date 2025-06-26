@@ -107,11 +107,23 @@ def analyze_log(file: UploadFile = File(...)):
 
         # Prepare results
         results = []
+        centers = kmeans.cluster_centers_
+
         for i, seq in enumerate(sequences):
+            cluster = clusters[i]
+            x_vec = X[i].toarray().flatten()
+            center = centers[cluster]
+            
+            # Calculate Euclidean distance as anomaly score
+            anomaly_score = float(np.linalg.norm(x_vec - center))
+            is_anomaly = anomaly_score > 0.5  # threshold for anomaly
+
             result = {
                 "window_start_line": lines[i],
                 "sequence": seq,
-                "cluster": int(clusters[i]),
+                "cluster": int(cluster),
+                "anomaly_score": anomaly_score,
+                "is_anomaly": is_anomaly
             }
             results.append(result)
 
