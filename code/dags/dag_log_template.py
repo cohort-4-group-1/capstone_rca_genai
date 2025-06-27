@@ -163,6 +163,7 @@ with DAG(
     schedule_interval=None,
     default_args=default_args,
     catchup=False,
+    is_paused_upon_creation=False,
     tags=["drain3", "log-parsing", "rca"],
     description="Extracts templates from structured logs and appends log key references"
 ) as dag:
