@@ -11,37 +11,61 @@ with DAG(
     tags=["orchestrator"]
 ) as dag:
 
-    dag_log_parse = TriggerDagRunOperator(
-        task_id="parse_convert_raw_log_to_structured",
+    trigger_dag_log_parse = TriggerDagRunOperator(
+        task_id="trigger_log_parse",
         trigger_dag_id="dag_log_parse",
-        wait_for_completion=True
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed', 'skipped']
+    )
+    
+    trigger_dag_log_eda = TriggerDagRunOperator(
+        task_id="trigger_log_eda",
+        trigger_dag_id="dag_log_eda",
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed', 'skipped']
     )
 
-    dag_log_template = TriggerDagRunOperator(
-        task_id="generate_template",
+    trigger_dag_log_template = TriggerDagRunOperator(
+        task_id="trigger_log_template",
         trigger_dag_id="dag_log_template",
-        wait_for_completion=True
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed', 'skipped']
     )
 
-    dag_log_sequence = TriggerDagRunOperator(
-        task_id="generate_log_sequence",
+    trigger_dag_log_sequence = TriggerDagRunOperator(
+        task_id="trigger_log_sequence",
         trigger_dag_id="dag_log_sequence",
-        wait_for_completion=True
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed', 'skipped']
     )
 
-    dag_log_clustering_kmeans = TriggerDagRunOperator(
-        task_id="train_rca_model_clustering_kmeans",
+    trigger_dag_log_clustering_kmeans = TriggerDagRunOperator(
+        task_id="trigger_train_rca_model_clustering_kmeans",
         trigger_dag_id="dag_log_clustering_kmeans",
-        wait_for_completion=True
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed', 'skipped']
     )
 
-    dag_log_deep_network_clustering_kmeans = TriggerDagRunOperator(
-        task_id="train_autoencoder_kmeans_pipeline",
+    trigger_dag_log_deep_network_clustering_kmeans = TriggerDagRunOperator(
+        task_id="trigger_train_autoencoder_kmeans_pipeline",
         trigger_dag_id="dag_log_deep_network_clustering_kmeans",
-        wait_for_completion=True
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed', 'skipped']
     )
 
-    dag_log_parse >> dag_log_template >> dag_log_sequence >> [
-        dag_log_clustering_kmeans,
-        dag_log_deep_network_clustering_kmeans
+    trigger_dag_log_parse >> trigger_dag_log_eda >> trigger_dag_log_template >> trigger_dag_log_sequence >> [
+        trigger_dag_log_clustering_kmeans,
+        trigger_dag_log_deep_network_clustering_kmeans
     ]

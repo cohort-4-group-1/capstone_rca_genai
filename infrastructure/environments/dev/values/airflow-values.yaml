@@ -8,7 +8,7 @@ dags:
   gitSync:
     enabled: true
     repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
-    branch: main
+    branch: ritam-workflow-automation
     subPath: "code/dags"          
     depth: 1 
 

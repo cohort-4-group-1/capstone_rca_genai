@@ -167,9 +167,7 @@ with DAG(
     description="Extracts templates from structured logs and appends log key references"
 ) as dag:
 
-    generate_templates = PythonOperator(
+    task = PythonOperator(
         task_id="generate_template",
         python_callable=convert_template_from_structured_log
-    )      
-
-    generate_templates 
+    ) 

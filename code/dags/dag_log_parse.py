@@ -54,14 +54,14 @@ start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, m
 
 with DAG(
     dag_id='dag_log_parse',
-    start_date=start_date_utc,
-    schedule_interval="*/30 * * * *",
+    start_date=datetime(2023, 1, 1),
+    schedule_interval=None,
     catchup=False,
     tags=['s3', 'validation', 'etl'],
 ) as dag:
 
-    parse_raw_log = PythonOperator(
+    task = PythonOperator(
         task_id='parse_convert_raw_log_to_structured',
         python_callable=convert_raw_log_to_csv
     )
-    parse_raw_log
+
