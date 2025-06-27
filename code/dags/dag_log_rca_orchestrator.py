@@ -17,7 +17,7 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed', 'skipped']
+        failed_states=['failed']
     )
     
     trigger_dag_log_eda = TriggerDagRunOperator(
@@ -26,7 +26,7 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed', 'skipped']
+        failed_states=['failed']
     )
 
     trigger_dag_log_template = TriggerDagRunOperator(
@@ -35,7 +35,7 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed', 'skipped']
+        failed_states=['failed']
     )
 
     trigger_dag_log_sequence = TriggerDagRunOperator(
@@ -44,7 +44,7 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed', 'skipped']
+        failed_states=['failed']
     )
 
     trigger_dag_log_clustering_kmeans = TriggerDagRunOperator(
@@ -53,7 +53,7 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed', 'skipped']
+        failed_states=['failed']
     )
 
     trigger_dag_log_deep_network_clustering_kmeans = TriggerDagRunOperator(
@@ -62,7 +62,7 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed', 'skipped']
+        failed_states=['failed']
     )
 
     trigger_dag_log_parse >> trigger_dag_log_eda >> trigger_dag_log_template >> trigger_dag_log_sequence >> [
