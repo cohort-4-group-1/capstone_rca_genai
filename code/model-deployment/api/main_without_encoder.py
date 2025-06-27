@@ -57,7 +57,10 @@ def load_resources():
 
 # --- Utility: Parse log lines into templates ---
 def parse_templates(lines: List[str]) -> List[str]:
-    return [TEMPLATE_MINER.add_log_message(line).template_mined or "" for line in lines]
+     return [
+        TEMPLATE_MINER.add_log_message(line).get("template_mined", "")
+        for line in lines
+    ]
 
 # --- Utility: Group templates into sequences ---
 def group_sequences(templates: List[str], window_size=10) -> List[str]:

@@ -20,6 +20,8 @@ import json
 import requests  # Required for invoking LLM-based context analysis
 import tensorflow as tf
 
+
+
 print(f"Tensor flow version: {tf.__version__}")
 app = FastAPI()
 
@@ -35,34 +37,42 @@ TEMPLATE_MINER = None
 @app.on_event("startup")
 def load_resources():
     global MODEL, TEMPLATE_MINER
-    
-    # Load model from S3
-    s3 = boto3.client("s3")
-    print("Loading model from S3...")
-    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.pkl")
-    vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))
-    
-    print("📥 Downloading best encoder model...")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".keras") as tmp_file:
-        s3.download_file(S3_BUCKET, f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.encoder.keras", tmp_file.name)
-        encoder = load_model(tmp_file.name)
+    try:
+        # Load model from S3
+        s3 = boto3.client("s3")
+        print("Loading model from S3...")
+        model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.DEEP_KMEANS_MODEL_OUTPUT}.pkl")
+        vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))    
+ 
+        temp_file = "rca_log_model.encoder.keras"
+        s3.download_file(S3_BUCKET, "models/clustering/deep_neural/kmeans/rca_log_model.encoder.keras", temp_file)
 
-    MODEL = (vectorizer, encoder, kmeans)
-    print("Encoder and pipeline loaded successfully")
 
-    # Load Drain3 state file from S3
-    print("Loading Drain3 template from S3...")
-    s3.download_file(S3_BUCKET, S3_TEMPLATE_KEY, LOCAL_TEMPLATE_PATH)
-    persistence = FilePersistence(LOCAL_TEMPLATE_PATH)
-    TEMPLATE_MINER = TemplateMiner(persistence, config=None)
+        auto_encoder_temp_file = "rca_log_model.autoencoder.keras"
+        s3.download_file(S3_BUCKET, "models/clustering/deep_neural/kmeans/rca_log_model.autoencoder.keras", auto_encoder_temp_file)
+   
+        encoder = load_model(temp_file)
+        autoencoder = load_model(auto_encoder_temp_file)
+        MODEL = (vectorizer, encoder, autoencoder,kmeans)
+        print("Encoder and pipeline loaded successfully")
 
-    print("Model and template miner loaded.")
-
+        # Load Drain3 state file from S3
+        print("Loading Drain3 template from S3...")
+        s3.download_file(S3_BUCKET, S3_TEMPLATE_KEY, LOCAL_TEMPLATE_PATH)
+        persistence = FilePersistence(LOCAL_TEMPLATE_PATH)
+        TEMPLATE_MINER = TemplateMiner(persistence, config=None)
+        if TEMPLATE_MINER is None:
+            raise RuntimeError("TEMPLATE_MINER is not initialized.")
+        print("Model and template miner loaded.")
+    except Exception as e:
+        print(f"Startup failed: {e}")
 
 # --- Utility: Parse log lines into templates ---
 def parse_templates(lines: List[str]) -> List[str]:
-    return [TEMPLATE_MINER.add_log_message(line).template_mined or "" for line in lines]
-
+     return [
+        TEMPLATE_MINER.add_log_message(line).get("template_mined", "")
+        for line in lines
+    ]
 # --- Utility: Group templates into sequences ---
 def group_sequences(templates: List[str], window_size=10) -> List[str]:
     sequences = []
@@ -92,7 +102,7 @@ def analyze_log(file: UploadFile = File(...)):
     if not MODEL:
         raise HTTPException(status_code=500, detail="Model not loaded")
 
-    vectorizer, encoder, kmeans = MODEL
+    vectorizer, encoder, autoencoder,kmeans = MODEL
 
     # Read uploaded log file
     lines = [line.decode("utf-8").strip() for line in file.file.readlines() if line.strip()]
@@ -111,7 +121,10 @@ def analyze_log(file: UploadFile = File(...)):
     clusters = kmeans.predict(latent)
 
     # Step 4: Calculate reconstruction error as anomaly score
-    recon = encoder.model.predict(X)  # Assumes decoder is part of encoder.model
+    recon = autoencoder.predict(X)  # Assumes decoder is part of encoder.model
+
+    print("X shape:", X.shape)
+    print("recon shape:", recon.shape)
     anomaly_scores = np.mean((X - recon)**2, axis=1)
 
     # Step 5: Map sequence result back to lines and enrich with LLM
@@ -121,7 +134,6 @@ def analyze_log(file: UploadFile = File(...)):
         #llm_analysis = analyze_context_with_llm(anomaly_line=lines[i], context_lines=context_lines)
         result = {
             "log_window_start": lines[i],
-            "sequence": sequences[i],
             "cluster": int(clusters[i]),
             "anomaly_score": float(anomaly_scores[i])#,
             #"context_analysis": llm_analysis

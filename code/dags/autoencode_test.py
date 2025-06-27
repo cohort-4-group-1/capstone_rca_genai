@@ -1,11 +1,9 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+
 from datetime import datetime, timedelta, timezone
 import boto3
 import pandas as pd
 import io
 import joblib
-import mlflow
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -21,8 +19,7 @@ import matplotlib.pyplot as plt
 S3_BUCKET = configuration.DEST_BUCKET
 S3_KEY = configuration.LOG_SEQUENCE__FILE_KEY
 S3_MODEL_KEY = configuration.DEEP_KMEANS_MODEL_OUTPUT
-LOCAL_MODEL_PATH = "/tmp/autoencoder_kmeans_model.pkl"
-MLFLOW_TRACKING_URI = "http://mlflow.mlflow.svc.cluster.local:5000"
+LOCAL_MODEL_PATH = "autoencoder_kmeans_model.pkl"
 LATENT_DIM = 32
 MAX_FEATURES = 1000
 N_CLUSTERS = 5
@@ -62,8 +59,6 @@ def plot_training_curves(history, output_path):
 def train_autoencoder_kmeans_pipeline():
     print("🚀 Starting autoencoder + KMeans pipeline")
     print(f"Tensor flow version: {tf.__version__}")
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment("openstack-log-anomaly-deep")
 
     # Read log sequences from S3
     s3 = boto3.client("s3")
@@ -96,10 +91,10 @@ def train_autoencoder_kmeans_pipeline():
     silhouette = silhouette_score(latent_vectors, cluster_labels)
     print(f"Silhouette score: {silhouette:.4f}")
 
-    encoder_path = "/tmp/encoder_model.keras"
-    encoder.save(encoder_path, save_format="keras")
+    encoder_path = "encoder_model.keras"
+    encoder.save(encoder_path)
     autoencoder_path = "autoencoder_model.keras"
-    autoencoder.save(autoencoder_path)    
+    autoencoder.save(autoencoder_path)
     joblib.dump((vectorizer,kmeans), LOCAL_MODEL_PATH)
 
     s3.upload_file(encoder_path, S3_BUCKET, f"{S3_MODEL_KEY}.encoder.keras")
@@ -108,45 +103,8 @@ def train_autoencoder_kmeans_pipeline():
     s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, f"{S3_MODEL_KEY}.pkl")
 
     print(f"☁️ Model uploaded to s3://{S3_BUCKET}/{S3_MODEL_KEY}")
-    curve_path = "/tmp/loss_curve.png"
-    plot_training_curves(history, curve_path)
-    print("📦 Logging model and metrics to MLflow")
-    with mlflow.start_run():
-        mlflow.log_param("latent_dim", LATENT_DIM)
-        mlflow.log_param("max_features", MAX_FEATURES)
-        mlflow.log_param("n_clusters", N_CLUSTERS)
-        mlflow.log_param("epochs", EPOCHS)
-        mlflow.log_param("batch_size", BATCH_SIZE)
-        mlflow.log_metric("silhouette_score", silhouette)
-        for i, loss in enumerate(history.history['loss']):
-            mlflow.log_metric("train_loss", loss, step=i)
 
-        if 'val_loss' in history.history:
-            for i, val_loss in enumerate(history.history['val_loss']):
-                mlflow.log_metric("val_loss", val_loss, step=i)
-
-        for cluster_id, count in Counter(cluster_labels).items():
-            mlflow.log_metric(f"cluster_{cluster_id}_count", count)
-
-        mlflow.log_artifact(LOCAL_MODEL_PATH)
-        mlflow.log_artifact(curve_path)
-        mlflow.set_tag("s3_model_path", f"s3://{S3_BUCKET}/{S3_MODEL_KEY}")
 
     print("✅ Training complete")
 
-# DAG Schedule
-now = datetime.now(timezone.utc)
-start_time = now.replace(minute=(now.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
-
-with DAG(
-    dag_id="dag_log_deep_network_clustering_kmeans",
-    start_date=start_time,
-    schedule_interval="@daily",
-    catchup=False,
-    tags=["log-anomaly", "deep-neural", "kmeans", "mlflow"],
-) as dag:
-    train_task = PythonOperator(
-        task_id="train_rca_model_deep_network_clustering_kmeans",
-        python_callable=train_autoencoder_kmeans_pipeline
-    )
-
+train_autoencoder_kmeans_pipeline()
