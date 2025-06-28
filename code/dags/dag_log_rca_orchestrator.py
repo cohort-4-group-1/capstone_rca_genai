@@ -66,6 +66,15 @@ with DAG(
         failed_states=['failed']
     )
     
+    trigger_dag_log_clustering_iforest = TriggerDagRunOperator(
+        task_id="trigger_log_clustering_iforest",
+        trigger_dag_id="dag_log_clustering_iforest",
+        wait_for_completion=True,
+        poke_interval=30,
+        allowed_states=['success'], 
+        failed_states=['failed']
+    )
+    
     trigger_dag_notify_model_updates = TriggerDagRunOperator(
         task_id="trigger_send_sqs_message",
         trigger_dag_id="send_sqs_message_dag",
@@ -77,6 +86,7 @@ with DAG(
 
     trigger_dag_log_parse >> trigger_dag_log_eda >> trigger_dag_log_template >> trigger_dag_log_sequence >> [
         trigger_dag_log_clustering_kmeans,
-        trigger_dag_log_deep_network_clustering_kmeans
+        trigger_dag_log_deep_network_clustering_kmeans,
+        trigger_dag_log_clustering_iforest
     ] >> trigger_dag_notify_model_updates
 

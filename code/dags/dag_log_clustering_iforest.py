@@ -101,9 +101,10 @@ now = datetime.now(timezone.utc)
 start_time = now.replace(minute=(now.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 with DAG(
     dag_id="dag_log_clustering_iforest",
-    start_date=start_time,
-    schedule_interval="@daily",
+    start_date=datetime(2023, 1, 1),
+    schedule_interval=None,
     catchup=False,
+    is_paused_upon_creation=False,
     tags=["model", "iforest", "optuna"]
 ) as dag:
 
