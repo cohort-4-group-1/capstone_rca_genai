@@ -7,7 +7,7 @@ import json
 def send_to_sqs(**context):
     # SQS setup
     sqs = boto3.client('sqs', region_name='us-east-1')  # Set your region
-    queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789012/my-queue'  # Replace with your queue URL
+    queue_url = 'https://sqs.us-east-1.amazonaws.com/141134438799/rca-queue'  # Replace with your queue URL
 
     # Optional: pass dynamic values using context or config
     message_body = {
