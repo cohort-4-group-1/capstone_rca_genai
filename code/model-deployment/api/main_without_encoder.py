@@ -6,17 +6,11 @@ import boto3
 import joblib
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from drain3.template_miner_config import TemplateMinerConfig
 from drain3.template_miner import TemplateMiner
 from drain3.file_persistence import FilePersistence
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
-from tensorflow.keras.models import load_model
 import numpy as np
 from typing import List
-import tempfile
 import configuration
-import json
 import requests  # Required for invoking LLM-based context analysis
 
 app = FastAPI()
@@ -36,16 +30,11 @@ def load_resources():
     
     # Load model from S3
     s3 = boto3.client("s3")
-    print("Loading model from S3...")
-    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.CLUSTERING_MODEL_OUTPUT}")
-    vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))
-    
-    print("📥 Downloading best encoder model...")
-
-
+    print(f"Loading model from S3...{configuration.CLUSTERING_MODEL_OUTPUT}")
+    model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.CLUSTERING_MODEL_OUTPUT}.pkl")
+    vectorizer, kmeans =  joblib.load(io.BytesIO(model_obj['Body'].read()))    
     MODEL = (vectorizer,  kmeans)
-    print("Encoder and pipeline loaded successfully")
-
+    
     # Load Drain3 state file from S3
     print("Loading Drain3 template from S3...")
     s3.download_file(S3_BUCKET, S3_TEMPLATE_KEY, LOCAL_TEMPLATE_PATH)
@@ -123,7 +112,6 @@ def analyze_log(file: UploadFile = File(...)):
 
             result = {
                 "window_start_line": lines[i],
-                "sequence": seq,
                 "cluster": int(cluster),
                 "anomaly_score": anomaly_score,
                 "is_anomaly": is_anomaly

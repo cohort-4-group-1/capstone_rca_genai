@@ -27,7 +27,7 @@ EPOCHS = 5
 def train_rca_model_clustering_kmeans():
     print("Started training rca model using clustering based on kmeans")
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment("openstack-log-anomaly")
+    mlflow.set_experiment("openstack-log-anomaly-clustering-kmeans")
 
     print(f"started to read log sequence for model input from {DATA_PATH}")
     # Read logs from S3
@@ -72,9 +72,9 @@ def train_rca_model_clustering_kmeans():
 
     print(f"started to upload the model in s3")
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    versioned_path = f"{configuration.CLUSTERING_MODEL_OUTPUT}_{timestamp}.pkl"    
+    versioned_path = f"{configuration.CLUSTERING_MODEL_OUTPUT}.pkl"    
     # Upload to S3
-    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, configuration.CLUSTERING_MODEL_OUTPUT)
+    s3.upload_file(LOCAL_MODEL_PATH, S3_BUCKET, versioned_path)
 
     print(f"started to track the model in mlflow")
     # Predict cluster labels with best model
