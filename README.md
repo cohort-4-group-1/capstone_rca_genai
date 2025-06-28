@@ -2,6 +2,7 @@
 This repository contains the capstone project - RCA with GenAI
 
 # Terraform commands
+terraform init -reconfigure  -backend-config="profile=default"
     terraform init
     terraform validate
     terraform plan
