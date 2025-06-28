@@ -101,16 +101,14 @@ def analyze_log(file: UploadFile = File(...)):
 
         results = []
         for i, seq in enumerate(sequences):
-            is_anomaly = preds[i] == -1
             anomaly_score = float(scores[i])
-
-            result = {
-                "window_start_line": lines[i],
-                "sequence": seq,
-                "anomaly_score": anomaly_score,
-                "is_anomaly": is_anomaly
-            }
-            results.append(result)
+            if (bool(preds[i] == -1) == False): 
+                result = {
+                    "window_start_line": lines[i],
+                    "anomaly_score": anomaly_score,
+                    "is_anomaly": bool(preds[i] == -1)
+                }
+                results.append(result)
 
         return results
 
