@@ -49,8 +49,9 @@ webserver:
       # Annotations to add to worker kubernetes service account.
       annotations:
         eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-web-s3-access  
-  service.type: LoadBalancer
-  service.port: 8080       
+  service:
+    type: ClusterIP
+    
 scheduler:
   serviceAccount:
     create: true
