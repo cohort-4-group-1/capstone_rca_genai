@@ -51,7 +51,7 @@ resource "aws_nat_gateway" "nat" {
 }
 
 resource "aws_eip" "nat" {
-  vpc = true
+  domain = "vpc"
 }
 
 resource "aws_route_table" "public" {
@@ -637,7 +637,7 @@ resource "aws_iam_role_policy" "sqs_access" {
         Action   = [
           "sqs:SendMessage"
         ],
-        Resource = aws_sqs_queue.my_queue.arn
+        Resource = aws_sqs_queue.rca_queue.arn
       }
     ]
   })
