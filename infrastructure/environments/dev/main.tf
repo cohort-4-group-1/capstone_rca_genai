@@ -701,7 +701,7 @@ queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789012/rca-queue'
 response = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=0)
 for msg in response.get('Messages', []):
     print('Received:', msg['Body'])
-    if 'retrain' in msg['Body']:
+    if 'retrain_model' in msg['Body']:
         print('Triggering retrain...')
         kubectl exec -n airflow $(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}') -- airflow dags trigger dag_log_rca_orchestrator
     else:

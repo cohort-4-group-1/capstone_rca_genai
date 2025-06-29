@@ -7,7 +7,7 @@ QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/141134438799/rca-queue'
 
 def lambda_handler(event, context):
     message_body = {
-        "message": "new_training_data_available",
+        "message": "retrain_model",
     }
 
     response = sqs.send_message(
