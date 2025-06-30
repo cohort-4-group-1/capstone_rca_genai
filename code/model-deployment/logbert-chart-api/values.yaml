@@ -9,11 +9,3 @@ api:
     repository: sujittah/logbert-api
     tag: latest
     port: 9000
-
-ui:
-  image:
-    repository: sujitttah/logbert-ui
-    tag: latest
-    port: 7860
-  service:
-    type: LoadBalancer

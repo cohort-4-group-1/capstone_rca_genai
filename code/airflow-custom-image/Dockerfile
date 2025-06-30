@@ -28,8 +28,9 @@ RUN pip install --no-cache-dir \
     matplotlib \
     seaborn \
     mlflow \
+    optuna \
     tensorflow==2.13.0 \
     keras==2.13.1 \
     transformers==4.31.0 \
     huggingface_hub \
-    optuna
+   
