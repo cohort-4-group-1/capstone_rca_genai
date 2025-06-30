@@ -1,0 +1,19 @@
+global:
+  region: us-east-1
+  serviceAccount:
+    name: logbert-s3-access
+    roleArn: arn:aws:iam::141134438799:role/iisc-capstone-rca-model-s3-access
+
+api:
+  image: sujittah/logbert-api:latest
+  port: 9000
+
+
+ui:
+  image:
+    repository: sujitttah/logbert-ui
+    tag: latest
+    port: 7860
+  service:
+    type: LoadBalancer
+

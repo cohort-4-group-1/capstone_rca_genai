@@ -1,0 +1,7 @@
+ui:
+  image:
+    repository: sujitttah/logbert-ui
+    tag: latest
+    port: 7860
+  service:
+    type: ClusterIP

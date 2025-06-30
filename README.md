@@ -45,7 +45,7 @@ docker build -t dask/dask-custom:2023.12.1 .
 docker tag dask/dask-custom:2023.12.1 sujittah/dask-custom:2023.12.1
 docker push sujittah/dask-custom:2023.12.1
 
-kubectl port-forward pod/airflow-webserver-688d749456-ngd8r 8080:8080 -n airflow        
+kubectl port-forward pod/airflow-webserver-f896554d7-4jdkl 8080:8080 -n airflow        
 kubectl port-forward pod/mlflow-d8f567dff-jpcpn 5000:5000 -n mlflow        
 
 kubectl port-forward pod/mlflo
@@ -80,7 +80,7 @@ terraform apply --auto-approve
 terraform show
 terraform state list
 terraform state show <resource_name>
-terraform state show aws_s3_bucket.my_bucket
+terraform state show aws _s3_bucket.my_bucket
 
 terraform destroy --auto-approve
 
@@ -91,13 +91,14 @@ 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
 docker build -t logbert-api -f Dockerfile.api .
 docker tag logbert-api sujittah/logbert-api:latest
 docker push sujittah/logbert-api:latest
+docker run -p 9000:9000 -e AWS_ACCESS_KEY_ID=AKIASBXCEUGHRC6J7JWK -e AWS_SECRET_ACCESS_KEY=IJQoce3B5Aak19zxcTSlqBsOfp+/zegLtCJSlfQ -e AWS_DEFAULT_REGION=us-east-1 logbert-api --encoder
 
 # Gradio
 docker build -t logbert-ui -f Dockerfile.gradio .
 docker tag logbert-ui sujittah/logbert-ui:latest
 docker push sujittah/logbert-ui:latest
 
-
+# Various Commads
  aws ec2 describe-volumes --filters Name=tag:ebs.csi.aws.com/cluster,Values=true Name=status,Values=available --query "Volumes[*][VolumeId,Tags[?Key=='kubernetes.io/created-for/pvc/name']|[0].Value,Size,CreateTime]" --output table
 ```
 
@@ -105,7 +106,11 @@ To delete all the volumes
 
 ``` s.csi.aws.com/cluster,Values=true Name=status,Values=available --query "Volumes[*].VolumeId" --output text | xargs -n1 aws ec2 delete-volume --volume-id
 
-
-
-
+aws ec2 delete-volume --volume-id 
 vol-059159e86323fde4c                                                                        
+
+uvicorn main_isolation_forest:app --host 0.0.0.0 --port 9000 --reload
+
+aws eks --region us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
+kubetctl get pods -n airflow
+kubectl port-forward pod/airflow-webserver-5d5f6f77cc-dbmbs 8080:8080 -n airflow        

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logbert-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logbert-ui
+  template:
+    metadata:
+      labels:
+        app: logbert-ui
+    spec:
+      serviceAccountName: {{ .Values.global.serviceAccount.name }}
+      containers:
+        - name: ui
+          image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.ui.image.port }}
+          env:
+            - name: AWS_REGION
+              value: {{ .Values.global.region }}

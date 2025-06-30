@@ -8,7 +8,7 @@ dags:
   gitSync:
     enabled: true
     repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
-    branch: main
+    branch: ritam-workflow-automation
     subPath: "code/dags"          
     depth: 1 
 
@@ -48,7 +48,10 @@ webserver:
       name: airflow-webserver-test
       # Annotations to add to worker kubernetes service account.
       annotations:
-        eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-web-s3-access         
+        eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-web-s3-access  
+  service:
+    type: ClusterIP
+    
 scheduler:
   serviceAccount:
     create: true

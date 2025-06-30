@@ -34,13 +34,13 @@ now_utc = datetime.now(timezone.utc)
 start_date_utc = now_utc.replace(minute=(now_utc.minute // 30) * 30, second=0, microsecond=0) - timedelta(minutes=5)
 with DAG(
     dag_id='dag_log_sequence',
-    start_date=start_date_utc,
-    schedule_interval="*/30 * * * *",
+    start_date=datetime(2023, 1, 1),
+    schedule_interval=None,
     catchup=False,
+    is_paused_upon_creation=False,
     tags=['s3', 'log_template', 'log_sequence'],
 ) as dag:
-    generate_log_sequence = PythonOperator(
+    task = PythonOperator(
         task_id='generate_log_sequence',
         python_callable=generate_log_sequence
     )
-    generate_log_sequence

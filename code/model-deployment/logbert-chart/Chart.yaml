@@ -1,4 +1,0 @@
-apiVersion: v2
-name: logbert
-description: Helm chart to deploy LogBERT API and UI on AWS EKS
-version: 0.1.0

@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-transformers
-tensorflow
-boto3
-gradio
-drain3
-pydantic

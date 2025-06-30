@@ -1,15 +1,26 @@
 import gradio as gr
-from shared.model_utils import download_and_load_model, predict_from_file
+import requests
 
-model = download_and_load_model()
+# Replace with actual FastAPI server URL
+API_URL = "http://localhost:9000/analyze-log"
 
-def predict_ui(file_obj):
-    return predict_from_file(model, file_obj.name)
+def call_logbert_api(file_obj):
+    try:
+        response = requests.post(
+            API_URL,
+            files={"file": (file_obj.name, file_obj, "text/plain")},
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result
+    except Exception as e:
+        return {"error": str(e)}
 
 gr.Interface(
-    fn=predict_ui,
-    inputs=gr.File(label="Upload raw log file"),
-    outputs=gr.Textbox(label="Reconstructed vector"),
-    title="LogBERT Gradio UI",
-    description="Upload raw logs → parse → predict reconstruction"
-).launch(server_name="0.0.0.0", server_port=7860)
+    fn=call_logbert_api,
+    inputs=gr.File(label="Upload log file"),
+    outputs="json",
+    title="LogBERT API Client",
+    description="This UI sends your uploaded log file to the running LogBERT FastAPI server for anomaly analysis."
+).launch(server_port=7860)

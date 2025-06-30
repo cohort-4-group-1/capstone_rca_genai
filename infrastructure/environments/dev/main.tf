@@ -51,7 +51,7 @@ resource "aws_nat_gateway" "nat" {
 }
 
 resource "aws_eip" "nat" {
-  vpc = true
+  domain = "vpc"
 }
 
 resource "aws_route_table" "public" {
@@ -238,21 +238,24 @@ resource "helm_release" "ebs_csi_driver" {
   chart      = "aws-ebs-csi-driver"
   version    = "2.30.0" # Use latest compatible version
 
-  set {
-    name  = "controller.serviceAccount.create"
-    value = true
-  }
-
-  set {
-    name  = "controller.serviceAccount.name"
-    value = "ebs-csi-controller-sa"
-  }
+  set = [
+    {
+      name  = "controller.serviceAccount.create"
+      value = true
+    }, 
+    {
+      name  = "controller.serviceAccount.name"
+      value = "ebs-csi-controller-sa"
+    }
+  ]
 
   # Add this line to use the IRSA role
- set_sensitive {
-  name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-  value = aws_iam_role.ebs_csi_sa.arn
-}
+ set_sensitive = [
+    {
+      name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+      value = aws_iam_role.ebs_csi_sa.arn
+    }
+ ]
 
   depends_on = [
     null_resource.wait_for_cluster,
@@ -487,6 +490,7 @@ resource "null_resource" "wait_for_cluster" {
   }
 }
 
+
 #-------------------------------------------------------------
 #Cluster Services
 #-------------------------------------------------------------
@@ -584,3 +588,137 @@ module "mlflow" {
   chart_version  = "0.7.3"
   values_files   = ["${path.module}/values/mlflow-values.yaml"]
 }
+
+#-------------------------------------------------------------
+# Retrain model based on SQS messages
+#-------------------------------------------------------------
+
+resource "aws_iam_role" "lambda_exec" {
+  name = "lambda_sqs_exec_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_policy_attachment" "lambda_basic_exec" {
+  name       = "lambda-basic-exec"
+  roles      = [aws_iam_role.lambda_exec.name]
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+
+resource "aws_sqs_queue" "rca_queue" {
+  name                       = "rca-queue"
+  delay_seconds              = 0
+  max_message_size           = 1024
+  message_retention_seconds  = 600
+  receive_wait_time_seconds  = 10
+  visibility_timeout_seconds = 30
+  tags = {
+    Name    = "rca-queue"
+    Project = "${var.project_name}"
+  }
+}
+
+resource "aws_iam_role_policy" "sqs_access" {
+  name = "lambda-sqs-access"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "sqs:SendMessage"
+        ],
+        Resource = aws_sqs_queue.rca_queue.arn
+      }
+    ]
+  })
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda"
+  output_path = "${path.module}/lambda_function_payload.zip"
+}
+
+resource "aws_lambda_function" "send_message_lambda" {
+  function_name = "SendMessageToSQS"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.9"
+  filename      = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  environment {
+    variables = {
+      SQS_URL = aws_sqs_queue.rca_queue.id
+    }
+  }
+}
+
+resource "kubernetes_cron_job" "retrain_model" {
+  metadata {
+    name      = "retrain-model-cron-job"
+    namespace = "airflow"
+  }
+
+  spec {
+    concurrency_policy            = "Replace"
+    failed_jobs_history_limit     = 5
+    schedule                      = "*/5 * * * *" # Every 5 minutes
+    starting_deadline_seconds     = 10
+    successful_jobs_history_limit = 10
+    job_template {
+      metadata {}
+      spec {
+        backoff_limit              = 2
+        ttl_seconds_after_finished = 10
+        template {
+          metadata {}
+          spec {
+            container {
+              name  = "airflow-cli-invoker"
+              image = "bitnami/kubectl:latest"
+              command = ["/bin/sh"]
+                            args = [
+                              "-c",
+                              <<-EOT
+              yum install -y python3 pip;
+              pip install boto3;
+
+python3 -c "
+import boto3
+sqs = boto3.client('sqs', region_name='us-east-1')
+queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789012/rca-queue'
+response = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=0)
+for msg in response.get('Messages', []):
+    print('Received:', msg['Body'])
+    if 'retrain_model' in msg['Body']:
+        print('Triggering retrain...')
+        kubectl exec -n airflow $(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}') -- airflow dags trigger dag_log_rca_orchestrator
+    else:
+        print('No retrain command found.')
+    sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=msg['ReceiptHandle'])
+"
+              EOT
+                            ]
+            }
+            restart_policy = "OnFailure"
+          }
+        }
+      }
+    }
+  }
+}
+
