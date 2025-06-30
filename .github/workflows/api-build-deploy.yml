@@ -92,6 +92,11 @@ jobs:
       with:
         version: 'latest'
 
+    - name: Install AWS CLI
+      uses: aws-actions/aws-cli-action@v2
+      with:
+        version: 'latest'
+
     - name: Update kube config
       run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
