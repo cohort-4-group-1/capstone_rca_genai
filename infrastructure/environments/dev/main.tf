@@ -667,7 +667,7 @@ resource "aws_lambda_function" "send_message_lambda" {
   }
 }
 
-resource "kubernetes_cron_job" "retrain_model" {
+resource "kubernetes_cron_job_v1" "retrain_model" {
   metadata {
     name      = "retrain-model-cron-job"
     namespace = "airflow"
