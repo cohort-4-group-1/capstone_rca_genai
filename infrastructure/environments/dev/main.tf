@@ -238,21 +238,24 @@ resource "helm_release" "ebs_csi_driver" {
   chart      = "aws-ebs-csi-driver"
   version    = "2.30.0" # Use latest compatible version
 
-  set {
-    name  = "controller.serviceAccount.create"
-    value = true
-  }
-
-  set {
-    name  = "controller.serviceAccount.name"
-    value = "ebs-csi-controller-sa"
-  }
+  set = [
+    {
+      name  = "controller.serviceAccount.create"
+      value = true
+    }, 
+    {
+      name  = "controller.serviceAccount.name"
+      value = "ebs-csi-controller-sa"
+    }
+  ]
 
   # Add this line to use the IRSA role
- set_sensitive {
-  name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-  value = aws_iam_role.ebs_csi_sa.arn
-}
+ set_sensitive = [
+    {
+      name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+      value = aws_iam_role.ebs_csi_sa.arn
+    }
+ ]
 
   depends_on = [
     null_resource.wait_for_cluster,
