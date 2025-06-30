@@ -16,3 +16,4 @@ ui:
     port: 7860
   service:
     type: LoadBalancer
+
