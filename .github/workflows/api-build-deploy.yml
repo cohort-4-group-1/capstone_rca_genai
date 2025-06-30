@@ -105,7 +105,7 @@ jobs:
       with:
         release: 'rca-api'
         namespace: 'api'
-        chart: 'code/model-deployment/logbert-chart'
+        chart: 'code/model-deployment/logbert-chart-api'
         token: '${{ github.token }}'
         values: |
           api.image: ${{ steps.build-image.outputs.image }}
