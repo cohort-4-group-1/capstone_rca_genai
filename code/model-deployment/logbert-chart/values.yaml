@@ -5,10 +5,9 @@ global:
     roleArn: arn:aws:iam::141134438799:role/iisc-capstone-rca-model-s3-access
 
 api:
-  image:
-    repository: sujittah/logbert-api
-    tag: latest
-    port: 9000
+  image: sujittah/logbert-api:latest
+  port: 9000
+
 
 ui:
   image:
