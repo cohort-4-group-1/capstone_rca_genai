@@ -62,12 +62,13 @@ def train_isolation_forest():
         scores = -model.decision_function(X)
         avg_score = float(np.mean(scores))
 
-        mlflow.log_params({
-            "n_estimators": n_estimators,
-            "contamination": contamination,
-            "max_samples": max_samples
-        })
-        mlflow.log_metric("avg_anomaly_score", avg_score)
+        with mlflow.start_run(nested=True):
+            mlflow.log_params({
+                "n_estimators": n_estimators,
+                "contamination": contamination,
+                "max_samples": max_samples
+            })
+            mlflow.log_metric("avg_anomaly_score", avg_score)
 
         return avg_score
 
