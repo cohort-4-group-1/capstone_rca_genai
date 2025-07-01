@@ -18,9 +18,9 @@ RUN pip install fastapi[standard] uvicorn
 COPY ./app /code/app
 
 # Expose the port the app runs on
-EXPOSE 8000
+EXPOSE 9000
 
 WORKDIR /code/app
 
 # Command to run the FastAPI app
-CMD ["uvicorn", "main_isolation_forest:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "main_isolation_forest:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
