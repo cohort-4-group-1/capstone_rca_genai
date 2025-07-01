@@ -7,5 +7,5 @@ spec:
   selector:
     app: logbert-api
   ports:
-    - port: {{ .Values.api.image.port }}
-      targetPort: {{ .Values.api.image.port }}
+    - port: {{ .Values.api.port }}
+      targetPort: {{ .Values.api.port }}
