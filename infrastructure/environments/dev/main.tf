@@ -722,3 +722,23 @@ for msg in response.get('Messages', []):
   }
 }
 
+#-------------------------------------------------------------
+# API and UI Deployment
+#-------------------------------------------------------------
+
+
+# Create an ECR repository
+resource "aws_ecr_repository" "my_ecr_repo" {
+  name                 = "capstone/rca-anomaly-detection"  # Replace with your desired repository name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true  # Enable image scanning on push
+  }
+
+  # Optional: Add tags
+  tags = {
+    Name = "RCA Image Repository"
+    Environment = "dev"
+  }
+}
