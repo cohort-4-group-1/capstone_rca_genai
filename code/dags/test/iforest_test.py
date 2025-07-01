@@ -1,10 +1,10 @@
-# dag_log_clustering_iforest.py
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import joblib
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import IsolationForest
 import boto3
+import tempfile
 import configuration
 import os
 import numpy as np
@@ -53,11 +53,12 @@ def train_isolation_forest():
         )
         model.fit(X)
         scores = -model.decision_function(X)
-        avg_score = float(np.mean(scores))        
+        avg_score = float(np.mean(scores))
         return avg_score
 
-    study = optuna.create_study(direction="maximize")    
+    study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=N_TRIALS)
+
     best_params = study.best_params
     iforest = IsolationForest(
         **best_params,
