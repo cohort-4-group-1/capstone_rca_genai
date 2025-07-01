@@ -102,14 +102,7 @@ jobs:
         version: 'latest'
       id: install
 
-    - name: Deploy with Helm
-      uses: deliverybot/helm@v1
-      with:
-        release: 'rca-api'
-        namespace: 'api'
-        chart: 'code/model-deployment/logbert-chart-api'
-        token: '${{ github.token }}'
-        values: |
-          api.image: ${{ steps.build-image.outputs.image }}
-        value-files: |
-          - values.yaml  
+    - name: Deploy to Kubernetes using Helm
+      run: |
+        kubectl create namespace api --dry-run -o yaml | kubectl apply -f -
+        helm upgrade --install rca-api code/model-deployment/logbert-chart-api --set api.image=${{ steps.build-image.outputs.image }} --namespace api
