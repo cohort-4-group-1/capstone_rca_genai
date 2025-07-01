@@ -8,5 +8,6 @@ api:
   image:
     repository: sujittah/logbert-api
     tag: latest
+  service:
     port: 9000
 
