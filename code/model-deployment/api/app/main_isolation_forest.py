@@ -14,7 +14,7 @@ from typing import List
 import configuration
 import requests  # Required for invoking LLM-based context analysis
 
-app = FastAPI()
+#app = FastAPI()
 
 # --- Globals ---
 S3_BUCKET = configuration.DEST_BUCKET
