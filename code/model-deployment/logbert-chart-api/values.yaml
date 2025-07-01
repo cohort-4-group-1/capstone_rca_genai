@@ -1,5 +1,6 @@
 global:
   region: us-east-1
+  namespace: api
   serviceAccount:
     name: logbert-s3-access
     roleArn: arn:aws:iam::141134438799:role/iisc-capstone-rca-model-s3-access
