@@ -4,7 +4,7 @@ boto3
 joblib
 pandas
 scikit-learn
-tensorflow==2.19.0 
+tensorflow
 drain3==0.9.11
 python-multipart
 dill
