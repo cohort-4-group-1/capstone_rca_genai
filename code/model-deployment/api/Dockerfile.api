@@ -9,5 +9,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENTRYPOINT ["python", "run_iforest.py"]
+ENTRYPOINT ["python", "main_isolation_forest.py"]
 CMD []
