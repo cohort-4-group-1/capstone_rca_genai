@@ -14,7 +14,7 @@ from typing import List
 import configuration
 import requests  # Required for invoking LLM-based context analysis
 
-#app = FastAPI()
+app = FastAPI()
 
 # --- Globals ---
 S3_BUCKET = configuration.DEST_BUCKET
@@ -24,8 +24,10 @@ LOCAL_TEMPLATE_PATH = configuration.TEMPLATE_DRAIN_FILE
 MODEL = None
 TEMPLATE_MINER = None
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+
+# # --- Load from S3 on startup ---
+@app.on_event("startup")
+def load_resources():
     global MODEL, TEMPLATE_MINER
     
     # Load model from S3
@@ -44,31 +46,6 @@ async def lifespan(app: FastAPI):
     TEMPLATE_MINER = TemplateMiner(persistence, config=None)
 
     print("Model and template miner loaded.")
-    
-app = FastAPI(lifespan=lifespan)
-
-
-# # --- Load from S3 on startup ---
-# @app.on_event("startup")
-# def load_resources():
-#     global MODEL, TEMPLATE_MINER
-    
-#     # Load model from S3
-#     s3 = boto3.client("s3")
-#     print(f"Loading model from S3...{configuration.ISOLATION_FOREST_MODEL_OUTPUT}")
-#     model_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{configuration.ISOLATION_FOREST_MODEL_OUTPUT}.pkl")
-#     vectorizer, iforest =  joblib.load(io.BytesIO(model_obj['Body'].read()))
-    
-#     MODEL = (vectorizer,  iforest)
-#     print("Encoder and pipeline loaded successfully")
-
-#     # Load Drain3 state file from S3
-#     print("Loading Drain3 template from S3...")
-#     s3.download_file(S3_BUCKET, S3_TEMPLATE_KEY, LOCAL_TEMPLATE_PATH)
-#     persistence = FilePersistence(LOCAL_TEMPLATE_PATH)
-#     TEMPLATE_MINER = TemplateMiner(persistence, config=None)
-
-#     print("Model and template miner loaded.")
 
 
 # --- Utility: Parse log lines into templates ---
