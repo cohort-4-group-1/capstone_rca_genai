@@ -96,19 +96,22 @@ jobs:
     - name: Update kube config
       run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
-    - name: Install Helm
-      uses: azure/setup-helm@v3
-      with:
-        version: 'latest'
+    - name: Access pods on EKS
+      run: kubectl get pods --all-namespaces
 
-    - name: Deploy with Helm
-      uses: deliverybot/helm@v1
-      with:
-        release: 'rca-api'
-        namespace: 'api'
-        chart: 'code/model-deployment/logbert-chart-api'
-        token: '${{ github.token }}'
-        values: |
-          api.image: ${{ steps.build-image.outputs.image }}
-        value-files: |
-          - values.yaml    
+    # - name: Install Helm
+    #   uses: azure/setup-helm@v3
+    #   with:
+    #     version: 'latest'
+
+    # - name: Deploy with Helm
+    #   uses: deliverybot/helm@v1
+    #   with:
+    #     release: 'rca-api'
+    #     namespace: 'api'
+    #     chart: 'code/model-deployment/logbert-chart-api'
+    #     token: '${{ github.token }}'
+    #     values: |
+    #       api.image: ${{ steps.build-image.outputs.image }}
+    #     value-files: |
+    #       - values.yaml    
