@@ -15,7 +15,7 @@ spec:
       serviceAccountName: {{ .Values.global.serviceAccount.name }}
       containers:
         - name: api
-          image: "{{ .Values.api.image.repository }}"
+          image: "{{ .Values.api.image}}"
           ports:
             - containerPort: {{ .Values.api.service.port }}
           env:
