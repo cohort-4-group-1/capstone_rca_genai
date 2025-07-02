@@ -667,6 +667,48 @@ resource "aws_lambda_function" "send_message_lambda" {
   }
 }
 
+# Create the service account
+resource "kubernetes_service_account" "pod_reader" {
+  metadata {
+    name      = var.service_account_name
+    namespace = "airflow"
+  }
+}
+
+# Create a Role with permission to list pods
+resource "kubernetes_role" "pod_reader_role" {
+  metadata {
+    namespace = "airflow"
+    name      = "${var.service_account_name}-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["list", "get", "watch"]
+  }
+}
+
+# Bind the role to the service account
+resource "kubernetes_role_binding" "pod_reader_binding" {
+  metadata {
+    name      = "${var.service_account_name}-binding"
+    namespace = "airflow"
+  }
+  
+  role_ref {
+    kind      = "Role"
+    name      = kubernetes_role.pod_reader_role.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
+  
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.pod_reader.metadata[0].name
+    namespace = "airflow"
+  }
+}
+
 resource "kubernetes_cron_job_v1" "retrain_model" {
   metadata {
     name      = "retrain-model-cron-job"
@@ -687,9 +729,10 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
         template {
           metadata {}
           spec {
+            service_account_name = kubernetes_service_account.pod_reader.metadata[0].name
             container {
               name  = "airflow-cli-invoker"
-              image = "bitnami/kubectl:latest"               
+              image = "capstone/retrain-rca-model-trigger:8af3bcd93e38e4775428628daeb881d0c1c80f2a"               
             }
             restart_policy = "OnFailure"
           }
