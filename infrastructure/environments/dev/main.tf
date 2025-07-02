@@ -689,30 +689,7 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
           spec {
             container {
               name  = "airflow-cli-invoker"
-              image = "bitnami/kubectl:latest"
-              command = ["/bin/sh"]
-                            args = [
-                              "-c",
-                              <<-EOT
-              yum install -y python3 pip;
-              pip install boto3;
-
-python3 -c "
-import boto3
-sqs = boto3.client('sqs', region_name='us-east-1')
-queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789012/rca-queue'
-response = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=0)
-for msg in response.get('Messages', []):
-    print('Received:', msg['Body'])
-    if 'retrain_model' in msg['Body']:
-        print('Triggering retrain...')
-        kubectl exec -n airflow $(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}') -- airflow dags trigger dag_log_rca_orchestrator
-    else:
-        print('No retrain command found.')
-    sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=msg['ReceiptHandle'])
-"
-              EOT
-                            ]
+              image = "bitnami/kubectl:latest"               
             }
             restart_policy = "OnFailure"
           }

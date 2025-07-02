@@ -32,7 +32,7 @@ on:
 
 env:
   AWS_REGION: us-east-1                  # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: capstone/rca-anomaly-detection          # set this to your Amazon ECR repository name
+  ECR_REPOSITORY: capstone/retrain-rca-model-trigger          # set this to your Amazon ECR repository name
   EKS_CLUSTER_NAME: iisc-capstone-rca-eks # set this to your Amazon EKS cluster name
 
 permissions:
