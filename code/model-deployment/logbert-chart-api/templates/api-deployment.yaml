@@ -16,6 +16,7 @@ spec:
       containers:
         - name: api
           image: "{{ .Values.api.image}}"
+          pullPolicy: Always
           ports:
             - containerPort: {{ .Values.api.service.port }}
           env:
