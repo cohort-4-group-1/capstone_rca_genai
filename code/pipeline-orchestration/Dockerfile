@@ -3,6 +3,9 @@ FROM python:3.12-slim
 # Set the working directory in the container
 WORKDIR /app
 
+# Copy the requirements file into the container
+COPY ./requirements.txt ./requirements.txt
+
 # Install the dependencies
 RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 
@@ -33,12 +36,7 @@ RUN mv kubectl /usr/local/bin/kubectl
 RUN kubectl version --client
 
 # Copy your application code (if applicable)
-# Copy the requirements file into the container
-COPY ./requirements.txt ./requirements.txt
 COPY ./script /app/script
 
-# Install Python dependencies (if applicable)
-RUN pip install -r requirements.txt
-
 # Define the command to run when the container starts
-CMD ["python", "/app/trigger_orchestration_dag.py"]
+CMD ["python", "/app/script/trigger_orchestration_dag.py"]
