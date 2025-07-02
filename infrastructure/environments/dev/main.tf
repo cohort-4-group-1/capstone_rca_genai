@@ -732,7 +732,7 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
             service_account_name = kubernetes_service_account.pod_reader.metadata[0].name
             container {
               name  = "airflow-cli-invoker"
-              image = "141134438799.dkr.ecr.us-east-1.amazonaws.com/capstone/retrain-rca-model-trigger:7d53db507544d773c3040f7166b47729aedd86b1"               
+              image = "141134438799.dkr.ecr.us-east-1.amazonaws.com/capstone/retrain-rca-model-trigger:latest"               
             }
             restart_policy = "OnFailure"
           }
