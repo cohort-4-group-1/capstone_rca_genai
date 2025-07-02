@@ -719,8 +719,8 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
     concurrency_policy            = "Replace"
     failed_jobs_history_limit     = 5
     schedule                      = "*/5 * * * *" # Every 5 minutes
-    starting_deadline_seconds     = 10
-    successful_jobs_history_limit = 10
+    starting_deadline_seconds     = 3
+    successful_jobs_history_limit = 1
     job_template {
       metadata {}
       spec {
@@ -732,9 +732,11 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
             service_account_name = kubernetes_service_account.pod_reader.metadata[0].name
             container {
               name  = "airflow-cli-invoker"
-              image = "141134438799.dkr.ecr.us-east-1.amazonaws.com/capstone/retrain-rca-model-trigger:latest"               
+              image = "141134438799.dkr.ecr.us-east-1.amazonaws.com/capstone/retrain-rca-model-trigger:latest"
+              termination_message_path = "/var/log/my-app.log"
+              termination_message_policy = "File"
             }
-            restart_policy = "OnFailure"
+            restart_policy = "Never"
           }
         }
       }
