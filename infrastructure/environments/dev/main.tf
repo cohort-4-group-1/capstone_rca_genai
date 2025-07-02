@@ -732,7 +732,7 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
             service_account_name = kubernetes_service_account.pod_reader.metadata[0].name
             container {
               name  = "airflow-cli-invoker"
-              image = "capstone/retrain-rca-model-trigger:8af3bcd93e38e4775428628daeb881d0c1c80f2a"               
+              image = "141134438799.dkr.ecr.us-east-1.amazonaws.com/capstone/retrain-rca-model-trigger:7d53db507544d773c3040f7166b47729aedd86b1"               
             }
             restart_policy = "OnFailure"
           }
@@ -750,6 +750,22 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
 # Create an ECR repository
 resource "aws_ecr_repository" "my_ecr_repo" {
   name                 = "capstone/rca-anomaly-detection"  # Replace with your desired repository name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true  # Enable image scanning on push
+  }
+
+  # Optional: Add tags
+  tags = {
+    Name = "RCA Image Repository"
+    Environment = "dev"
+  }
+}
+
+# Create an ECR repository
+resource "aws_ecr_repository" "trigger_ecr_repo" {
+  name                 = "capstone/retrain-rca-model-trigger"  # Replace with your desired repository name
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
