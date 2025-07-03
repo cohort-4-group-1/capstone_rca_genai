@@ -35,11 +35,8 @@ def trigger_dag(pod_name, dag_id, conf=None):
         
 # --- Trigger API pods ---
 def delete_api_pods():
-    try:
-        base_cmd = ["kubectl", "delete", "pods", "-n", 'api', "--all"]
-        subprocess.run(base_cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error deleting API pods: {e}")
+    base_cmd = ["kubectl", "delete", "pods", "-n", 'api', "--all"]
+    subprocess.run(base_cmd, check=True)
 
 
 def trigger_dag_by_api(conf=None):
@@ -87,17 +84,14 @@ def main():
             except subprocess.CalledProcessError as e:
                 print("Error triggering DAG:", e)
                 
-        elif 'model_updated' in body: 
-            model_updated_command = body['model_updated']
-            print(f"Model updated command found: {model_updated_command}")
+        elif 'model_updated' in msg['Body']: 
             print("Deleting API pods")
-
             try:
-                trigger_dag(pod_name=pod_name, dag_id=DAG_ID, conf={"retrain_command": retrain_command})
-                print(f"DAG {DAG_ID} triggered successfully with retrain command.")
+                delete_api_pods()
+                print("API pods deleted successfully.")
                 sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
             except subprocess.CalledProcessError as e:
-                print("Error triggering DAG with retrain command:", e)
+                print("Error deleting API pods:", e)
 
         else:
             print('No retrain command found.')
