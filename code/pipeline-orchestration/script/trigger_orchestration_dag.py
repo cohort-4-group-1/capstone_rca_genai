@@ -1,6 +1,8 @@
 import boto3
 import json
 import subprocess
+import requests
+import os
 
 # --- Configuration ---
 SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/141134438799/rca-queue"
@@ -26,6 +28,20 @@ def trigger_dag(pod_name, dag_id, conf=None):
         conf_json = json.dumps(conf)
         base_cmd += ["--conf", conf_json]
     subprocess.run(base_cmd, check=True)
+
+AIRFLOW_API_BASE = "http://airflow-webserver.airflow.svc.cluster.local:8080/api/v1"
+
+def trigger_dag_by_api(conf=None):
+    AIRFLOW_API_BASE = "http://airflow-webserver.airflow.svc.cluster.local:8080/api/v1"
+    url = f"{AIRFLOW_API_BASE}/dags/{DAG_ID}/dagRuns"
+    payload = {
+        "conf": conf or {},
+    }
+    print (f"Started to invoke based on Rest API: URL: {url} and payload: {conf}")
+    response = requests.post(url, json=payload, auth=("admin", "admin"))  # if using basic auth
+    print("Status:", response.status_code)
+    print("Response:", response.text)
+    response.raise_for_status()
 
 # --- Main logic ---
 def main():
