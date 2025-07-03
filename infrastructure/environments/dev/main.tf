@@ -805,7 +805,7 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
   spec {
     concurrency_policy            = "Replace"
     failed_jobs_history_limit     = 5
-    schedule                      = "*/5 * * * *" # Every 5 minutes
+    schedule                      = "*/1 * * * *" # Every 1 minutes
     starting_deadline_seconds     = 3
     successful_jobs_history_limit = 1
     job_template {
