@@ -614,6 +614,12 @@ resource "aws_iam_policy_attachment" "lambda_basic_exec" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_policy_attachment" "cronjob_sqs_access_sa" {
+  name       = "sqs-reader-access"
+  roles      = [aws_iam_role.lambda_exec.name]
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonSQSFullAccess"
+}
+
 
 resource "aws_sqs_queue" "rca_queue" {
   name                       = "rca-queue"
@@ -672,8 +678,13 @@ resource "kubernetes_service_account" "pod_reader" {
   metadata {
     name      = var.service_account_name
     namespace = "airflow"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.lambda_exec.arn
+    }
   }
 }
+
+
 
 # Create a Role with permission to list pods
 resource "kubernetes_role" "pod_reader_role" {
@@ -724,8 +735,8 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
     job_template {
       metadata {}
       spec {
-        backoff_limit              = 2
-        ttl_seconds_after_finished = 10
+        backoff_limit              = 1
+        ttl_seconds_after_finished = 180
         template {
           metadata {}
           spec {
