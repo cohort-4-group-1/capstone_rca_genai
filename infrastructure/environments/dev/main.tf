@@ -696,7 +696,7 @@ resource "kubernetes_role" "pod_reader_role" {
   rule {
     api_groups = [""]
     resources  = ["pods"]
-    verbs      = ["list", "get", "watch"]
+    verbs      = ["list", "get", "watch", "exec"]
   }
 }
 
