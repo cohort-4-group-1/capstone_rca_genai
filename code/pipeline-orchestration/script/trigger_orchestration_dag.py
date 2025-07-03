@@ -72,7 +72,7 @@ def main():
             print("Triggering DAG in pod:", pod_name)
 
             try:
-                trigger_dag()
+                trigger_dag(pod_name=pod_name, dag_id=DAG_ID)
                 print(f"DAG {DAG_ID} triggered successfully.")
                 sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
             except subprocess.CalledProcessError as e:
