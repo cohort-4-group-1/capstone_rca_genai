@@ -3,7 +3,7 @@ import json
 import subprocess
 
 # --- Configuration ---
-SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/123456789012/rca-queue"
+SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/141134438799/rca-queue"
 AWS_REGION = "us-east-1"
 DAG_ID = "dag_log_rca_orchestrator"
 AIRFLOW_POD_LABEL = "component=webserver"  # or scheduler
@@ -30,7 +30,7 @@ def trigger_dag(pod_name, dag_id, conf=None):
 # --- Main logic ---
 def main():
     sqs = boto3.client("sqs", region_name=AWS_REGION)
-
+    print(f"Consuming message from Queue : {SQS_QUEUE_URL}")
     response = sqs.receive_message(
         QueueUrl=SQS_QUEUE_URL,
         MaxNumberOfMessages=1,
@@ -38,6 +38,7 @@ def main():
     )
 
     messages = response.get("Messages", [])
+   
     if not messages:
         print("No messages found.")
         return
