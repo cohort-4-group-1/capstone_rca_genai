@@ -832,7 +832,7 @@ resource "kubernetes_role_binding" "pod_delete_binding" {
   subject {
     kind      = "ServiceAccount"
     name      = kubernetes_service_account.pod_reader.metadata[0].name
-    namespace = "api"
+    namespace = "airflow"
   }
 }
 
