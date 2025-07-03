@@ -37,7 +37,7 @@ def trigger_dag_by_api(conf=None):
         "conf": conf or {},
     }
     print (f"Started to invoke based on Rest API: URL: {url} and payload: {conf}")
-    response = requests.post(url, json=payload, auth=("airflow", "airflow"))  # if using basic auth
+    response = requests.post(url, json=payload, auth=("admin", "admin"))  # if using basic auth
     print("Status:", response.status_code)
     print("Response:", response.text)
     response.raise_for_status()
