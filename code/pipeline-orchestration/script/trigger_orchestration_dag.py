@@ -29,7 +29,6 @@ def trigger_dag(pod_name, dag_id, conf=None):
         base_cmd += ["--conf", conf_json]
     subprocess.run(base_cmd, check=True)
 
-AIRFLOW_API_BASE = "http://airflow-webserver.airflow.svc.cluster.local:8080/api/v1"
 
 def trigger_dag_by_api(conf=None):
     AIRFLOW_API_BASE = "http://airflow-webserver.airflow.svc.cluster.local:8080/api/v1"
@@ -70,11 +69,13 @@ def main():
             print("Triggering DAG in pod:", pod_name)
 
             try:
-                trigger_dag(pod_name, DAG_ID, conf=body)
+                trigger_dag_by_api(conf=body)
                 print(f"DAG {DAG_ID} triggered successfully.")
                 sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
             except subprocess.CalledProcessError as e:
                 print("Error triggering DAG:", e)
+                
+
         else:
             print('No retrain command found.')
 
