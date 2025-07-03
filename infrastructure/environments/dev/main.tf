@@ -305,6 +305,11 @@ resource "aws_iam_role_policy_attachment" "airflow_s3_access_sa" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
 
+resource "aws_iam_role_policy_attachment" "airflow_sqs_access_sa" {
+  role       = aws_iam_role.airflow_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
+}
+
 resource "aws_iam_role" "airflow_web_s3_access_sa" {
   name = "${var.name_prefix}-airflow-web-s3-access"
 
@@ -744,7 +749,7 @@ resource "kubernetes_role" "pod_reader_role" {
 resource "kubernetes_role" "pod_exec_role" {
   metadata {
     namespace = "airflow"
-    name      = "${var.service_account_name}-role"
+    name      = "${var.service_account_name}-exec-role"
   }
 
   rule {
