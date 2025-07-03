@@ -23,11 +23,14 @@ def get_airflow_pod_name():
 
 # --- Trigger Airflow DAG ---
 def trigger_dag(pod_name, dag_id, conf=None):
-    base_cmd = ["kubectl", "exec", "-n", NAMESPACE, pod_name, "--", "airflow", "dags", "trigger", dag_id]
-    if conf:
-        conf_json = json.dumps(conf)
-        base_cmd += ["--conf", conf_json]
-    subprocess.run(base_cmd, check=True)
+    try:
+        base_cmd = ["kubectl", "exec", "-n", NAMESPACE, pod_name, "--", "airflow", "dags", "trigger", dag_id]
+        if conf:
+            conf_json = json.dumps(conf)
+            base_cmd += ["--conf", conf_json]
+        subprocess.run(base_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error triggering DAG {dag_id} in pod {pod_name}: {e}")
 
 
 def trigger_dag_by_api(conf=None):
@@ -69,7 +72,7 @@ def main():
             print("Triggering DAG in pod:", pod_name)
 
             try:
-                trigger_dag_by_api(conf=body)
+                trigger_dag()
                 print(f"DAG {DAG_ID} triggered successfully.")
                 sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
             except subprocess.CalledProcessError as e:
