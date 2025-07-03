@@ -736,7 +736,21 @@ resource "kubernetes_role" "pod_reader_role" {
   rule {
     api_groups = [""]
     resources  = ["pods"]
-    verbs      = ["list", "get", "watch", "exec"]
+    verbs      = ["list", "get", "watch"]
+  }
+}
+
+# Create a Role with permission to list pods
+resource "kubernetes_role" "pod_exec_role" {
+  metadata {
+    namespace = "airflow"
+    name      = "${var.service_account_name}-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources = ["pods/exec"]
+    verbs = ["create"]
   }
 }
 
@@ -752,6 +766,28 @@ resource "kubernetes_role_binding" "pod_reader_binding" {
     name      = kubernetes_role.pod_reader_role.metadata[0].name
     api_group = "rbac.authorization.k8s.io"
   }
+  
+  
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.pod_reader.metadata[0].name
+    namespace = "airflow"
+  }
+}
+
+# Bind the role to the service account
+resource "kubernetes_role_binding" "pod_exec_binding" {
+  metadata {
+    name      = "${var.service_account_name}-exec-binding"
+    namespace = "airflow"
+  }
+  
+  role_ref {
+    kind      = "Role"
+    name      = kubernetes_role.pod_exec_role.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
+  
   
   subject {
     kind      = "ServiceAccount"
