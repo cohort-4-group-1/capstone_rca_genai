@@ -45,8 +45,9 @@ docker build -t dask/dask-custom:2023.12.1 .
 docker tag dask/dask-custom:2023.12.1 sujittah/dask-custom:2023.12.1
 docker push sujittah/dask-custom:2023.12.1
 
-kubectl port-forward pod/airflow-webserver-f896554d7-4jdkl 8080:8080 -n airflow        
-kubectl port-forward pod/mlflow-d8f567dff-jpcpn 5000:5000 -n mlflow        
+kubectl port-forward pod/airflow-webserver-759fccf694-ftk5n 8080:8080 -n airflow        
+kubectl port-forward pod/mlflow-d8f567dff-jpcpn 5000:5000 -n mlflow   
+kubectl port-forward pod/logbert-api-f89c5b9ff-kshzr  9000:9000 -n api
 
 kubectl port-forward pod/mlflo
 
@@ -109,8 +110,26 @@ To delete all the volumes
 aws ec2 delete-volume --volume-id 
 vol-059159e86323fde4c                                                                        
 
-uvicorn main_isolation_forest:app --host 0.0.0.0 --port 9000 --reload
+uvicorn main_encoder:app --host 0.0.0.0 --port 9000 --reload
 
 aws eks --region us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
 kubetctl get pods -n airflow
 kubectl port-forward pod/airflow-webserver-5d5f6f77cc-dbmbs 8080:8080 -n airflow        
+
+
+aws logs describe-log-streams --log-group-name "/aws/lambda/SendMessageToSQS" --order-by LastEventTime --descending 
+ --limit 3
+
+ aws iam attach-user-policy --user-name terraform --policy-arn arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
+
+ aws iam put-user-policy --user-name terraform --policy-name LambdaLogsReadAccess --policy-document file://cloudwatch-logs-inline-policy.json
+
+aws logs get-log-events `
+  --log-group-name "/aws/lambda/SendMessageToSQS" `
+  --log-stream-name "2025/06/30/`[$LATEST`]71e28f6cfdd94ba98001444434efeb26"
+
+helm upgrade --install rca-api code/model-deployment/logbert-chart-api -f code/model-deployment/logbert-chart-api/values.yaml  --namespace api
+
+aws iam get-role --role-name iisc-capstone-rca-model-s3-access --query "Role.AssumeRolePolicyDocument" --output json
+
+aws iam list-roles --query "Roles[?starts_with(RoleName, 'logbert-s3-access')].RoleName" --output text
