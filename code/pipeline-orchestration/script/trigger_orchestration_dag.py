@@ -21,6 +21,7 @@ def get_airflow_pod_name():
     ]
     return subprocess.check_output(cmd).decode("utf-8").strip()
 
+
 # --- Trigger Airflow DAG ---
 def trigger_dag(pod_name, dag_id, conf=None):
     try:
@@ -31,6 +32,14 @@ def trigger_dag(pod_name, dag_id, conf=None):
         subprocess.run(base_cmd, check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error triggering DAG {dag_id} in pod {pod_name}: {e}")
+        
+# --- Trigger API pods ---
+def delete_api_pods():
+    try:
+        base_cmd = ["kubectl", "delete", "pods", "-n", 'api', "--all"]
+        subprocess.run(base_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error deleting API pods: {e}")
 
 
 def trigger_dag_by_api(conf=None):
@@ -78,6 +87,17 @@ def main():
             except subprocess.CalledProcessError as e:
                 print("Error triggering DAG:", e)
                 
+        elif 'model_updated' in body: 
+            model_updated_command = body['model_updated']
+            print(f"Model updated command found: {model_updated_command}")
+            print("Deleting API pods")
+
+            try:
+                trigger_dag(pod_name=pod_name, dag_id=DAG_ID, conf={"retrain_command": retrain_command})
+                print(f"DAG {DAG_ID} triggered successfully with retrain command.")
+                sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
+            except subprocess.CalledProcessError as e:
+                print("Error triggering DAG with retrain command:", e)
 
         else:
             print('No retrain command found.')
