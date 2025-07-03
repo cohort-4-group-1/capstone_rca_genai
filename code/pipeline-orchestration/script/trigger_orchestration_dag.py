@@ -1,0 +1,65 @@
+import boto3
+import json
+import subprocess
+
+# --- Configuration ---
+SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/123456789012/rca-queue"
+AWS_REGION = "us-east-1"
+DAG_ID = "dag_log_rca_orchestrator"
+AIRFLOW_POD_LABEL = "component=webserver"  # or scheduler
+NAMESPACE = "airflow"
+
+# --- Get Airflow Pod name ---
+def get_airflow_pod_name():
+    cmd = [
+        "kubectl", "get", "pods",
+        "-n", NAMESPACE,
+        "-l", AIRFLOW_POD_LABEL,
+        "-o", "jsonpath={.items[0].metadata.name}"
+    ]
+    return subprocess.check_output(cmd).decode("utf-8").strip()
+
+# --- Trigger Airflow DAG ---
+def trigger_dag(pod_name, dag_id, conf=None):
+    base_cmd = ["kubectl", "exec", "-n", NAMESPACE, pod_name, "--", "airflow", "dags", "trigger", dag_id]
+    if conf:
+        conf_json = json.dumps(conf)
+        base_cmd += ["--conf", conf_json]
+    subprocess.run(base_cmd, check=True)
+
+# --- Main logic ---
+def main():
+    sqs = boto3.client("sqs", region_name=AWS_REGION)
+
+    response = sqs.receive_message(
+        QueueUrl=SQS_QUEUE_URL,
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=10
+    )
+
+    messages = response.get("Messages", [])
+    if not messages:
+        print("No messages found.")
+        return
+
+    for msg in messages:
+        receipt_handle = msg["ReceiptHandle"]
+        body = json.loads(msg["Body"])
+        print("Received SQS message:", body)
+        
+        if 'retrain_model' in msg['Body']:
+            print('Triggering retrain...')
+            pod_name = get_airflow_pod_name()
+            print("Triggering DAG in pod:", pod_name)
+
+            try:
+                trigger_dag(pod_name, DAG_ID, conf=body)
+                print(f"DAG {DAG_ID} triggered successfully.")
+                sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
+            except subprocess.CalledProcessError as e:
+                print("Error triggering DAG:", e)
+        else:
+            print('No retrain command found.')
+
+if __name__ == "__main__":
+    main()
