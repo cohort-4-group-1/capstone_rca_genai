@@ -759,6 +759,20 @@ resource "kubernetes_role" "pod_exec_role" {
   }
 }
 
+# Create a Role with permission to list pods
+resource "kubernetes_role" "pod_delete_role" {
+  metadata {
+    namespace = "api"
+    name      = "${var.service_account_name}-delete-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["list", "get", "watch", "delete"]
+  }
+}
+
 # Bind the role to the service account
 resource "kubernetes_role_binding" "pod_reader_binding" {
   metadata {
@@ -798,6 +812,27 @@ resource "kubernetes_role_binding" "pod_exec_binding" {
     kind      = "ServiceAccount"
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
+  }
+}
+
+# Bind the role to the service account
+resource "kubernetes_role_binding" "pod_delete_binding" {
+  metadata {
+    name      = "${var.service_account_name}-delete-binding"
+    namespace = "api"
+  }
+  
+  role_ref {
+    kind      = "Role"
+    name      = kubernetes_role.pod_delete_role.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
+  
+  
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.pod_reader.metadata[0].name
+    namespace = "api"
   }
 }
 
