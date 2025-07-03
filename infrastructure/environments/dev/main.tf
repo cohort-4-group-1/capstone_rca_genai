@@ -392,12 +392,35 @@ resource "aws_iam_role" "logbert_model_s3_access_sa" {
       },
       Condition = {
        StringEquals = {
-       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:logbert-model:logbert-s3-access"
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:api:logbert-s3-access"
         "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
         }
       }
     }]
   })
+}
+
+resource "aws_s3_bucket_notification" "openstack_logs_trigger" {
+  bucket = "rca.logs.openstack" # existing bucket name
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.send_message_lambda.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "raw/"
+  }
+
+    depends_on = [
+      aws_lambda_function.send_message_lambda,
+      aws_lambda_permission.allow_s3
+    ]
+}
+
+resource "aws_lambda_permission" "allow_s3" {
+  statement_id  = "AllowS3Invoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.send_message_lambda.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = "arn:aws:s3:::rca.logs.openstack"
 }
 
 resource "aws_iam_role_policy_attachment" "logbert_model_scheduler_s3_access_sa" {
@@ -598,14 +621,31 @@ resource "aws_iam_role" "lambda_exec" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Action    = "sts:AssumeRole",
-      Effect    = "Allow",
-      Principal = {
-        Service = "lambda.amazonaws.com"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:airflow:pod-reader",
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
       }
-    }]
+    ]
   })
+
+    
 }
 
 resource "aws_iam_policy_attachment" "lambda_basic_exec" {
@@ -617,7 +657,7 @@ resource "aws_iam_policy_attachment" "lambda_basic_exec" {
 resource "aws_iam_policy_attachment" "cronjob_sqs_access_sa" {
   name       = "sqs-reader-access"
   roles      = [aws_iam_role.lambda_exec.name]
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonSQSFullAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
 }
 
 
@@ -696,7 +736,7 @@ resource "kubernetes_role" "pod_reader_role" {
   rule {
     api_groups = [""]
     resources  = ["pods"]
-    verbs      = ["list", "get", "watch"]
+    verbs      = ["list", "get", "watch", "exec"]
   }
 }
 
