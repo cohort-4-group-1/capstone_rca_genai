@@ -10,3 +10,4 @@ python-multipart
 dill
 langchain
 transformers
+langchain_community
