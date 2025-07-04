@@ -2,7 +2,6 @@
 
 from langchain import PromptTemplate, LLMChain
 from langchain.llms import HuggingFacePipeline
-from langchain.output_parsers import StrOutputParser
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import json
 
@@ -25,7 +24,6 @@ hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
 
 template = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
-parser = StrOutputParser()
 chain = LLMChain(prompt=template, llm=llm)
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
@@ -35,6 +33,6 @@ def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: s
         log_window_text=log_window_text
     )
     try:
-        return json.loads(parser.parse(response))
+        return json.loads(response)
     except Exception as e:
         return {"raw_output": response, "error": str(e)}
