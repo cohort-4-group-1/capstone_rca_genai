@@ -54,6 +54,9 @@ prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 chain = prompt | llm
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
+    MAX_LOG_WINDOW_CHARS = 2000
+    if len(log_window_text) > MAX_LOG_WINDOW_CHARS:
+        log_window_text = log_window_text[-MAX_LOG_WINDOW_CHARS:]
     input_vars = {
         "anomaly_line": anomaly_line,
         "log_sequence": log_sequence,

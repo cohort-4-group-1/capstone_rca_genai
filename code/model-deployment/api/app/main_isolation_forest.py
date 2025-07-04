@@ -67,7 +67,8 @@ def group_sequences(templates: List[str], window_size=10) -> List[str]:
 
 # --- Utility: Call LLM-based contextual analyzer ---
 def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dict:
-    log_sequence = " ".join(parse_templates(context_lines))  # generate log sequence from templates
+    log_template = " ".join(parse_templates(context_lines))  # generate log sequence from templates
+    log_sequence = group_sequences(log_template, window_size=10)
     log_window_text = "\n".join(context_lines)
     return contextual_analysis(anomaly_line, log_sequence, log_window_text)
 
