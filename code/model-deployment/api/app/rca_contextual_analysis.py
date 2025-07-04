@@ -1,7 +1,8 @@
 # rca_contextual_analysis.py
 
-from langchain import PromptTemplate, LLMChain
-from langchain.llms import HuggingFacePipeline
+from langchain_core.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain_community.llms import HuggingFacePipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import json
 

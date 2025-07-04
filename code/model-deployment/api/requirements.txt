@@ -11,3 +11,4 @@ dill
 langchain
 transformers
 langchain_community
+torch
