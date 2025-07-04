@@ -14,7 +14,7 @@ from typing import List
 import configuration
 import requests  # Required for invoking LLM-based context analysis
 from rca_contextual_analysis import contextual_analysis 
-
+import traceback
 
 app = FastAPI()
 
@@ -124,4 +124,5 @@ def analyze_log(file: UploadFile = File(...)):
         return results
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}")
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}")
