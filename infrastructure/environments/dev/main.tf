@@ -1,20 +1,3 @@
-# Terraform configuration to set up VPC + EKS (converted from CloudFormation and extended with EKS resources)
-
-provider "aws" {
-   region = var.aws_region   
-}
-
-
-
-terraform {
- backend "s3" {
-    bucket         = "rca-tfstate-dev" 
-    key            = "terraform.tfstate"     
-    region          = "us-east-1"  
-    encrypt        = true
- }
-}
-
 #-------------------------------------------------------------
 # VPC
 #-------------------------------------------------------------
@@ -141,12 +124,24 @@ resource "aws_iam_role" "eks_cluster" {
     Project = "${var.project_name}"
   }
 
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "eks_cluster" {
   role       = aws_iam_role.eks_cluster.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "aws_iam_role" "eks_node_group" {
@@ -163,6 +158,14 @@ resource "aws_iam_role" "eks_node_group" {
       Sid    = ""
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "eks_ebs_csi_driver" {
@@ -202,11 +205,25 @@ resource "aws_iam_role" "ebs_csi_sa" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "ebs_csi_sa" {
   role       = aws_iam_role.ebs_csi_sa.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 
@@ -238,10 +255,11 @@ resource "helm_release" "ebs_csi_driver" {
   chart      = "aws-ebs-csi-driver"
   version    = "2.30.0" # Use latest compatible version
 
+  # Use array syntax for Helm 3.x
   set = [
     {
       name  = "controller.serviceAccount.create"
-      value = true
+      value = "true"
     }, 
     {
       name  = "controller.serviceAccount.name"
@@ -250,12 +268,12 @@ resource "helm_release" "ebs_csi_driver" {
   ]
 
   # Add this line to use the IRSA role
- set_sensitive = [
+  set_sensitive = [
     {
       name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
       value = aws_iam_role.ebs_csi_sa.arn
     }
- ]
+  ]
 
   depends_on = [
     null_resource.wait_for_cluster,
@@ -267,16 +285,34 @@ resource "helm_release" "ebs_csi_driver" {
 resource "aws_iam_role_policy_attachment" "eks_worker_node" {
   role       = aws_iam_role.eks_node_group.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "eks_cni" {
   role       = aws_iam_role.eks_node_group.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "eks_registry" {
   role       = aws_iam_role.eks_node_group.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "aws_iam_role" "airflow_s3_access_sa" {
@@ -298,11 +334,25 @@ resource "aws_iam_role" "airflow_s3_access_sa" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "airflow_s3_access_sa" {
   role       = aws_iam_role.airflow_s3_access_sa.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "aws_iam_role" "airflow_web_s3_access_sa" {
@@ -324,11 +374,25 @@ resource "aws_iam_role" "airflow_web_s3_access_sa" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "airflow_web_s3_access_sa" {
   role       = aws_iam_role.airflow_web_s3_access_sa.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "aws_iam_role" "airflow_scheduler_s3_access_sa" {
@@ -350,11 +414,25 @@ resource "aws_iam_role" "airflow_scheduler_s3_access_sa" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "airflow_scheduler_s3_access_sa" {
   role       = aws_iam_role.airflow_scheduler_s3_access_sa.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 
@@ -377,6 +455,14 @@ resource "aws_iam_role" "dask_s3_access_sa" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role" "logbert_model_s3_access_sa" {
@@ -398,11 +484,25 @@ resource "aws_iam_role" "logbert_model_s3_access_sa" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "logbert_model_scheduler_s3_access_sa" {
   role       = aws_iam_role.logbert_model_s3_access_sa.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 resource "kubernetes_namespace" "dask" {
@@ -426,6 +526,12 @@ resource "kubernetes_service_account" "dask_access" {
 resource "aws_iam_role_policy_attachment" "dask_s3_access_sa" {
   role       = aws_iam_role.dask_s3_access_sa.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  
+  # Add lifecycle rule to prevent destroy issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = []
+  }
 }
 
 #-------------------------------------------------------------
@@ -445,6 +551,19 @@ resource "aws_eks_cluster" "main" {
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster
   ]
+  
+  # Add explicit timeouts for EKS operations
+  timeouts {
+    create = "45m"  # Increased timeout
+    delete = "45m"  # Increased timeout
+  }
+  
+  # Ensure node group is deleted before cluster
+  lifecycle {
+    prevent_destroy = false
+    # Force dependencies to be handled correctly
+    create_before_destroy = false
+  }
 }
 
 #-------------------------------------------------------------
@@ -461,12 +580,27 @@ resource "aws_eks_node_group" "default" {
     min_size     = 1
   }
   instance_types = ["m5.xlarge"]
+  disk_size      = 40
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node,
     aws_iam_role_policy_attachment.eks_cni,
     aws_iam_role_policy_attachment.eks_registry
   ]
+  
+  # Add explicit timeouts for node group operations
+  timeouts {
+    create = "45m"  # Increased timeout
+    delete = "45m"  # Increased timeout  
+    update = "45m"
+  }
+  
+  # Force this to be deleted before cluster
+  lifecycle {
+    prevent_destroy = false
+    # This ensures node group is destroyed before cluster
+    create_before_destroy = false
+  }
 }
 
 
@@ -606,6 +740,14 @@ resource "aws_iam_role" "lambda_exec" {
       }
     }]
   })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
 }
 
 resource "aws_iam_policy_attachment" "lambda_basic_exec" {
