@@ -8,4 +8,4 @@ spec:
     app: logbert-ui
   ports:
     - port: 80
-      targetPort: {{ .Values.ui.image.port }}
+      targetPort: {{ .Values.ui.service.port }}

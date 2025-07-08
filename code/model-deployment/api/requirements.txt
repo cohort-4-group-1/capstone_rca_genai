@@ -8,3 +8,7 @@ tensorflow==2.19.0
 drain3==0.9.11
 python-multipart
 dill
+langchain
+transformers
+langchain_community
+torch

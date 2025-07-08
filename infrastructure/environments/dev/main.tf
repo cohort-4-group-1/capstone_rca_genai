@@ -355,6 +355,11 @@ resource "aws_iam_role_policy_attachment" "airflow_s3_access_sa" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "airflow_sqs_access_sa" {
+  role       = aws_iam_role.airflow_s3_access_sa.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
+}
+
 resource "aws_iam_role" "airflow_web_s3_access_sa" {
   name = "${var.name_prefix}-airflow-web-s3-access"
 
@@ -478,7 +483,7 @@ resource "aws_iam_role" "logbert_model_s3_access_sa" {
       },
       Condition = {
        StringEquals = {
-       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:logbert-model:logbert-s3-access"
+       "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:api:logbert-s3-access"
         "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
         }
       }
@@ -492,6 +497,29 @@ resource "aws_iam_role" "logbert_model_s3_access_sa" {
       tags["kubernetes.io/cluster/*"]
     ]
   }
+}
+
+resource "aws_s3_bucket_notification" "openstack_logs_trigger" {
+  bucket = "rca.logs.openstack" # existing bucket name
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.send_message_lambda.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "raw/"
+  }
+
+    depends_on = [
+      aws_lambda_function.send_message_lambda,
+      aws_lambda_permission.allow_s3
+    ]
+}
+
+resource "aws_lambda_permission" "allow_s3" {
+  statement_id  = "AllowS3Invoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.send_message_lambda.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = "arn:aws:s3:::rca.logs.openstack"
 }
 
 resource "aws_iam_role_policy_attachment" "logbert_model_scheduler_s3_access_sa" {
@@ -732,13 +760,28 @@ resource "aws_iam_role" "lambda_exec" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Action    = "sts:AssumeRole",
-      Effect    = "Allow",
-      Principal = {
-        Service = "lambda.amazonaws.com"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:airflow:pod-reader",
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
       }
-    }]
+    ]
   })
   
   # Add lifecycle rule to handle IAM role deletion issues
@@ -754,6 +797,12 @@ resource "aws_iam_policy_attachment" "lambda_basic_exec" {
   name       = "lambda-basic-exec"
   roles      = [aws_iam_role.lambda_exec.name]
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_policy_attachment" "cronjob_sqs_access_sa" {
+  name       = "sqs-reader-access"
+  roles      = [aws_iam_role.lambda_exec.name]
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
 }
 
 
@@ -809,7 +858,125 @@ resource "aws_lambda_function" "send_message_lambda" {
   }
 }
 
-resource "kubernetes_cron_job" "retrain_model" {
+# Create the service account
+resource "kubernetes_service_account" "pod_reader" {
+  metadata {
+    name      = var.service_account_name
+    namespace = "airflow"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.lambda_exec.arn
+    }
+  }
+}
+
+
+
+# Create a Role with permission to list pods
+resource "kubernetes_role" "pod_reader_role" {
+  metadata {
+    namespace = "airflow"
+    name      = "${var.service_account_name}-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["list", "get", "watch"]
+  }
+}
+
+# Create a Role with permission to list pods
+resource "kubernetes_role" "pod_exec_role" {
+  metadata {
+    namespace = "airflow"
+    name      = "${var.service_account_name}-exec-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources = ["pods/exec"]
+    verbs = ["create"]
+  }
+}
+
+# Create a Role with permission to list pods
+resource "kubernetes_role" "pod_delete_role" {
+  metadata {
+    namespace = "api"
+    name      = "${var.service_account_name}-delete-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["list", "get", "watch", "delete"]
+  }
+}
+
+# Bind the role to the service account
+resource "kubernetes_role_binding" "pod_reader_binding" {
+  metadata {
+    name      = "${var.service_account_name}-binding"
+    namespace = "airflow"
+  }
+  
+  role_ref {
+    kind      = "Role"
+    name      = kubernetes_role.pod_reader_role.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
+  
+  
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.pod_reader.metadata[0].name
+    namespace = "airflow"
+  }
+}
+
+# Bind the role to the service account
+resource "kubernetes_role_binding" "pod_exec_binding" {
+  metadata {
+    name      = "${var.service_account_name}-exec-binding"
+    namespace = "airflow"
+  }
+  
+  role_ref {
+    kind      = "Role"
+    name      = kubernetes_role.pod_exec_role.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
+  
+  
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.pod_reader.metadata[0].name
+    namespace = "airflow"
+  }
+}
+
+# Bind the role to the service account
+resource "kubernetes_role_binding" "pod_delete_binding" {
+  metadata {
+    name      = "${var.service_account_name}-delete-binding"
+    namespace = "api"
+  }
+  
+  role_ref {
+    kind      = "Role"
+    name      = kubernetes_role.pod_delete_role.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
+  
+  
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.pod_reader.metadata[0].name
+    namespace = "airflow"
+  }
+}
+
+resource "kubernetes_cron_job_v1" "retrain_model" {
   metadata {
     name      = "retrain-model-cron-job"
     namespace = "airflow"
@@ -818,45 +985,25 @@ resource "kubernetes_cron_job" "retrain_model" {
   spec {
     concurrency_policy            = "Replace"
     failed_jobs_history_limit     = 5
-    schedule                      = "*/5 * * * *" # Every 5 minutes
-    starting_deadline_seconds     = 10
-    successful_jobs_history_limit = 10
+    schedule                      = "*/1 * * * *" # Every 1 minutes
+    starting_deadline_seconds     = 3
+    successful_jobs_history_limit = 1
     job_template {
       metadata {}
       spec {
-        backoff_limit              = 2
-        ttl_seconds_after_finished = 10
+        backoff_limit              = 1
+        ttl_seconds_after_finished = 180
         template {
           metadata {}
           spec {
+            service_account_name = kubernetes_service_account.pod_reader.metadata[0].name
             container {
               name  = "airflow-cli-invoker"
-              image = "bitnami/kubectl:latest"
-              command = ["/bin/sh"]
-                            args = [
-                              "-c",
-                              <<-EOT
-              yum install -y python3 pip;
-              pip install boto3;
-
-python3 -c "
-import boto3
-sqs = boto3.client('sqs', region_name='us-east-1')
-queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789012/rca-queue'
-response = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=0)
-for msg in response.get('Messages', []):
-    print('Received:', msg['Body'])
-    if 'retrain_model' in msg['Body']:
-        print('Triggering retrain...')
-        kubectl exec -n airflow $(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}') -- airflow dags trigger dag_log_rca_orchestrator
-    else:
-        print('No retrain command found.')
-    sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=msg['ReceiptHandle'])
-"
-              EOT
-                            ]
+              image = "141134438799.dkr.ecr.us-east-1.amazonaws.com/capstone/retrain-rca-model-trigger:latest"
+              termination_message_path = "/var/log/my-app.log"
+              termination_message_policy = "File"
             }
-            restart_policy = "OnFailure"
+            restart_policy = "Never"
           }
         }
       }
@@ -864,3 +1011,39 @@ for msg in response.get('Messages', []):
   }
 }
 
+#-------------------------------------------------------------
+# API and UI Deployment
+#-------------------------------------------------------------
+
+
+# Create an ECR repository
+resource "aws_ecr_repository" "my_ecr_repo" {
+  name                 = "capstone/rca-anomaly-detection"  # Replace with your desired repository name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true  # Enable image scanning on push
+  }
+
+  # Optional: Add tags
+  tags = {
+    Name = "RCA Image Repository"
+    Environment = "dev"
+  }
+}
+
+# Create an ECR repository
+resource "aws_ecr_repository" "trigger_ecr_repo" {
+  name                 = "capstone/retrain-rca-model-trigger"  # Replace with your desired repository name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true  # Enable image scanning on push
+  }
+
+  # Optional: Add tags
+  tags = {
+    Name = "RCA Image Repository"
+    Environment = "dev"
+  }
+}

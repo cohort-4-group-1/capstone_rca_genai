@@ -98,3 +98,14 @@ variable "install_postgres" {
   type        = bool
   default     = true
 }
+
+#--------------------------------------------------------------
+# Cronjob Job Variables
+#--------------------------------------------------------------
+
+
+variable "service_account_name" {
+  description = "Name of the service account"
+  type        = string
+  default     = "pod-reader"
+}
