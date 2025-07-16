@@ -8,11 +8,10 @@ WORKDIR /code
 # Copy the requirements file into the container
 COPY ./requirements.txt /code/requirements.txt
 
-RUN pip install --no-cache-dir gradio
+RUN pip install --no-cache-dir \
+    gradio \
+    request
 
-# Install the dependencies
-RUN python -m pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /code/requirements.txt
 
 
 # Copy the rest of the application code into the container
