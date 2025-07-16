@@ -104,4 +104,4 @@ jobs:
     - name: Deploy to Kubernetes using Helm
       run: |
         kubectl create namespace api --dry-run -o yaml | kubectl apply -f -
-        helm upgrade --install rca-ui code/model-deployment/logbert-chart-ui -f code/model-deployment/logbert-chart-ui/values.yaml --set api.image=${{ steps.build-image.outputs.image }} --namespace api
+        helm upgrade --install rca-ui code/model-deployment/logbert-chart-ui -f code/model-deployment/logbert-chart-ui/values.yaml --set ui.image=${{ steps.build-image.outputs.image }} --namespace api
