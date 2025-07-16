@@ -10,9 +10,8 @@ COPY ./requirements.txt /code/requirements.txt
 
 
 # Install required Python libraries
-RUN pip install --no-cache-dir \
-    gradio \
-    request
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /code/requirements.txt
 
 
 
