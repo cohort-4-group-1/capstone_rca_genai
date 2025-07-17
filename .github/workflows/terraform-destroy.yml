@@ -109,6 +109,15 @@ jobs:
       id: destroy
       run: terraform apply -auto-approve tfdestroyplan
       
+    # Clean up orphaned EBS volumes after destroy
+    - name: Clean up EBS Volumes
+      id: cleanup_volumes
+      if: success() && steps.destroy.outcome == 'success'
+      run: |
+        echo "🧹 Running EBS volume cleanup script..."
+        chmod +x ./cleanup_volumes_only.sh
+        ./cleanup_volumes_only.sh
+      
     # Create a GitHub issue if destroy fails
     - name: Create Issue on Failure
       if: failure() && steps.destroy.outcome == 'failure'
@@ -139,7 +148,7 @@ jobs:
           
     # Notify about successful destroy
     - name: Create Success Issue
-      if: success() && steps.destroy.outcome == 'success'
+      if: success() && steps.destroy.outcome == 'success' && steps.cleanup_volumes.outcome == 'success'
       uses: actions/github-script@v6
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -155,7 +164,10 @@ jobs:
             Triggered by: @${{ github.actor }}
             Workflow run: [View Run Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
             
-            All resources in this environment have been destroyed.
+            ✅ All infrastructure resources destroyed
+            ✅ Orphaned EBS volumes cleaned up
+            
+            Complete clean destroy with no orphaned resources!
             `
           })
           
