@@ -47,7 +47,11 @@ Respond in this JSON format:
 model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id)
-hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
+hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer,  max_length=2048,       
+    max_new_tokens=300,      
+    truncation=True,         
+    do_sample=True,
+    temperature=0.7)
 
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
 prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
@@ -55,8 +59,15 @@ chain = prompt | llm
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     MAX_LOG_WINDOW_CHARS = 2000
+    MAX_LOG_WINDOW_CHARS = 1000
+    MAX_SEQUENCE_CHARS = 1000
+
     if len(log_window_text) > MAX_LOG_WINDOW_CHARS:
         log_window_text = log_window_text[-MAX_LOG_WINDOW_CHARS:]
+
+    if len(log_sequence) > MAX_SEQUENCE_CHARS:
+        log_sequence = log_sequence[-MAX_SEQUENCE_CHARS:]
+        
     input_vars = {
         "anomaly_line": anomaly_line,
         "log_sequence": log_sequence,
