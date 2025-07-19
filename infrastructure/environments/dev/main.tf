@@ -539,6 +539,13 @@ resource "kubernetes_namespace" "dask" {
   }
 }
 
+# Create API namespace for model deployment
+resource "kubernetes_namespace" "api" {
+  metadata {
+    name = "api"
+  }
+}
+
 # Kubernetes ServiceAccount with annotation
 resource "kubernetes_service_account" "dask_access" {
   metadata {
@@ -774,7 +781,26 @@ resource "aws_iam_role" "lambda_exec" {
         Principal = {
           Service = "lambda.amazonaws.com"
         }
-      },
+      }
+    ]
+  })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
+}
+
+# Separate IRSA role for Kubernetes service account
+resource "aws_iam_role" "pod_reader_irsa" {
+  name = "${var.name_prefix}-pod-reader-irsa"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
       {
         Effect = "Allow"
         Action = "sts:AssumeRoleWithWebIdentity"
@@ -808,7 +834,7 @@ resource "aws_iam_policy_attachment" "lambda_basic_exec" {
 
 resource "aws_iam_policy_attachment" "cronjob_sqs_access_sa" {
   name       = "sqs-reader-access"
-  roles      = [aws_iam_role.lambda_exec.name]
+  roles      = [aws_iam_role.pod_reader_irsa.name]
   policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
 }
 
@@ -871,9 +897,11 @@ resource "kubernetes_service_account" "pod_reader" {
     name      = var.service_account_name
     namespace = "airflow"
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.lambda_exec.arn
+      "eks.amazonaws.com/role-arn" = aws_iam_role.pod_reader_irsa.arn
     }
   }
+  
+  depends_on = [module.airflow]
 }
 
 
@@ -890,6 +918,8 @@ resource "kubernetes_role" "pod_reader_role" {
     resources  = ["pods"]
     verbs      = ["list", "get", "watch"]
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Create a Role with permission to list pods
@@ -904,6 +934,8 @@ resource "kubernetes_role" "pod_exec_role" {
     resources = ["pods/exec"]
     verbs = ["create"]
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Create a Role with permission to list pods
@@ -918,6 +950,8 @@ resource "kubernetes_role" "pod_delete_role" {
     resources  = ["pods"]
     verbs      = ["list", "get", "watch", "delete"]
   }
+
+  depends_on = [kubernetes_namespace.api]
 }
 
 # Bind the role to the service account
@@ -939,6 +973,8 @@ resource "kubernetes_role_binding" "pod_reader_binding" {
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Bind the role to the service account
@@ -960,6 +996,8 @@ resource "kubernetes_role_binding" "pod_exec_binding" {
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Bind the role to the service account
@@ -981,6 +1019,8 @@ resource "kubernetes_role_binding" "pod_delete_binding" {
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
   }
+
+  depends_on = [kubernetes_namespace.api]
 }
 
 resource "kubernetes_cron_job_v1" "retrain_model" {
@@ -1016,6 +1056,13 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
       }
     }
   }
+  
+  depends_on = [
+    module.airflow, 
+    kubernetes_service_account.pod_reader,
+    kubernetes_role_binding.pod_reader_binding,
+    kubernetes_role_binding.pod_exec_binding
+  ]
 }
 
 #-------------------------------------------------------------
@@ -1027,6 +1074,7 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
 resource "aws_ecr_repository" "my_ecr_repo" {
   name                 = "capstone/rca-anomaly-detection"  # Replace with your desired repository name
   image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow force delete of images
 
   image_scanning_configuration {
     scan_on_push = true  # Enable image scanning on push
@@ -1043,6 +1091,7 @@ resource "aws_ecr_repository" "my_ecr_repo" {
 resource "aws_ecr_repository" "trigger_ecr_repo" {
   name                 = "capstone/retrain-rca-model-trigger"  # Replace with your desired repository name
   image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow force delete of images
 
   image_scanning_configuration {
     scan_on_push = true  # Enable image scanning on push
@@ -1055,10 +1104,11 @@ resource "aws_ecr_repository" "trigger_ecr_repo" {
   }
 }
 
-# Create an ECR repository
+# Create an ECR repository for Gradio UI
 resource "aws_ecr_repository" "gradio_ecr_repo" {
-  name                 = "capstone/gradio"  # Replace with your desired repository name
+  name                 = "capstone/gradio"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow force delete of images
 
   image_scanning_configuration {
     scan_on_push = true  # Enable image scanning on push
@@ -1066,7 +1116,7 @@ resource "aws_ecr_repository" "gradio_ecr_repo" {
 
   # Optional: Add tags
   tags = {
-    Name = "Gradio UI Image Repository"
+    Name = "Gradio UI Repository"
     Environment = "dev"
   }
 }
