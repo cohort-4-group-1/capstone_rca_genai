@@ -764,6 +764,56 @@ resource "kubernetes_namespace" "api" {
   }
 }
 
+# Loki for log aggregation
+module "loki" {
+  source       = "./modules/helm_release"
+  count        = var.install_loki ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "loki"
+  namespace    = "monitoring"
+  chart        = "loki"
+  repo         = "https://grafana.github.io/helm-charts"
+  values_files = ["${path.module}/values/loki-values.yaml"]
+  chart_version = "6.6.4"
+}
+
+# Jaeger for distributed tracing
+module "jaeger" {
+  source       = "./modules/helm_release"
+  count        = var.install_jaeger ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "jaeger"
+  namespace    = "monitoring"
+  chart        = "jaeger"
+  repo         = "https://jaegertracing.github.io/helm-charts"
+  values_files = ["${path.module}/values/jaeger-values.yaml"]
+  chart_version = "3.0.10"
+}
+
+# OpenTelemetry Collector for metrics and traces
+module "otel_collector" {
+  source       = "./modules/helm_release"
+  count        = var.install_otel_collector ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness and Jaeger
+  depends_on   = [null_resource.wait_for_cluster, module.jaeger]
+
+  enabled      = true
+  name         = "opentelemetry-collector"
+  namespace    = "monitoring"
+  chart        = "opentelemetry-collector"
+  repo         = "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  values_files = ["${path.module}/values/otel-collector-values.yaml"]
+  chart_version = "0.97.1"
+}
 
 #-------------------------------------------------------------
 # Retrain model based on SQS messages

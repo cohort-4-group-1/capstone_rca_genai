@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-otel-config
+  namespace: airflow
+data:
+  otel_config.py: |
+    """
+    OpenTelemetry configuration for Airflow
+    This file configures automatic instrumentation for Airflow components
+    """
+    import os
+    from opentelemetry import trace, metrics
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+    # Resource configuration
+    resource = Resource.create({
+        "service.name": os.getenv("OTEL_SERVICE_NAME", "airflow"),
+        "service.version": os.getenv("AIRFLOW_VERSION", "2.10.5"),
+        "deployment.environment": os.getenv("OTEL_RESOURCE_ATTRIBUTES", "dev"),
+        "k8s.cluster.name": "airflow-cluster",
+        "k8s.namespace.name": os.getenv("AIRFLOW__KUBERNETES__NAMESPACE", "airflow")
+    })
+
+    # Configure tracing
+    trace_provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(trace_provider)
+
+    # OTLP trace exporter
+    otlp_exporter = OTLPSpanExporter(
+        endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://opentelemetry-collector:4318") + "/v1/traces",
+        headers={}
+    )
+    
+    span_processor = BatchSpanProcessor(otlp_exporter)
+    trace_provider.add_span_processor(span_processor)
+
+    # Configure metrics
+    metric_reader = PeriodicExportingMetricReader(
+        OTLPMetricExporter(
+            endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://opentelemetry-collector:4318") + "/v1/metrics",
+        ),
+        export_interval_millis=5000,
+    )
+    
+    metrics_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+    metrics.set_meter_provider(metrics_provider)
+
+    # Auto-instrument common libraries
+    FlaskInstrumentor().instrument()
+    Psycopg2Instrumentor().instrument()
+    SQLAlchemyInstrumentor().instrument()
+    RequestsInstrumentor().instrument()
+
+    print("OpenTelemetry instrumentation configured for Airflow")
+
+  airflow_local_settings.py: |
+    """
+    Airflow local settings for OpenTelemetry integration
+    This file is automatically loaded by Airflow
+    """
+    import logging
+    import os
+    from airflow.configuration import conf
+
+    # Import OpenTelemetry configuration
+    try:
+        exec(open('/opt/airflow/otel/otel_config.py').read())
+        logging.info("OpenTelemetry instrumentation loaded successfully")
+    except Exception as e:
+        logging.error(f"Failed to load OpenTelemetry instrumentation: {e}")
+
+    # Custom log formatter with trace context
+    class OTelLogFormatter(logging.Formatter):
+        def format(self, record):
+            from opentelemetry import trace
+            
+            # Add trace context to log records
+            span = trace.get_current_span()
+            if span:
+                trace_id = format(span.get_span_context().trace_id, "032x")
+                span_id = format(span.get_span_context().span_id, "016x")
+                record.trace_id = trace_id
+                record.span_id = span_id
+            else:
+                record.trace_id = ""
+                record.span_id = ""
+            
+            return super().format(record)
+
+    # Configure logging with trace context
+    AIRFLOW_FORMATTER = OTelLogFormatter(
+        "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s [trace_id=%(trace_id)s span_id=%(span_id)s]"
+    )
+
+    # Apply formatter to all handlers
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        handler.setFormatter(AIRFLOW_FORMATTER)

@@ -1,6 +1,6 @@
 images:
   airflow:
-    repository: sujittah/airflow-custom
+    repository: cricet/airflow-custom
     tag: "2.10.5"
     pullPolicy: Always
 
@@ -8,7 +8,7 @@ dags:
   gitSync:
     enabled: true
     repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
-    branch: llm
+    branch: feat/observability
     subPath: "code/dags"          
     depth: 1 
 
@@ -79,11 +79,86 @@ redis:
     size: 1Gi
     storageClassName: gp3
 
-# Keep logs in cluster for Grafana observability (minimal size)
+# Disable logs persistence to avoid ReadWriteMany access mode issues with EBS
+# Logs will be stored locally in each pod and accessible via kubectl logs
 logs:
   persistence:
-    enabled: true
-    size: 5Gi  # Reduced from 100Gi default - for Grafana log monitoring
-    storageClassName: gp3
+    enabled: false
 
-# DAGs persistence not needed (using GitSync)  
+# DAGs persistence not needed (using GitSync)
+
+# OpenTelemetry configuration for observability
+config:
+  webserver:
+    # Enable metrics endpoint
+    expose_config: true
+  
+  # Core Airflow configuration
+  core:
+    # Enable metrics collection
+    load_examples: false
+    enable_xcom_pickling: false
+    
+  # Metrics configuration
+  metrics:
+    # Enable statsd metrics
+    statsd_on: true
+    statsd_host: opentelemetry-collector
+    statsd_port: 8125
+    statsd_prefix: airflow
+
+  # Logging configuration  
+  logging:
+    # Log level
+    logging_level: INFO
+    # Enable colored logs
+    colored_console_log: true
+    # Remote logging (disabled since we use OpenTelemetry Collector)
+    remote_logging: false
+
+# Environment variables for OpenTelemetry
+env:
+  # OpenTelemetry configuration
+  - name: OTEL_SERVICE_NAME
+    value: "airflow"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://opentelemetry-collector:4318"
+  - name: OTEL_EXPORTER_OTLP_PROTOCOL
+    value: "http/protobuf"
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: "service.name=airflow,service.version=2.10.5,deployment.environment=dev"
+  - name: OTEL_TRACES_EXPORTER
+    value: "otlp"
+  - name: OTEL_METRICS_EXPORTER
+    value: "otlp"
+  - name: OTEL_LOGS_EXPORTER
+    value: "otlp"  # Now using OTEL for unified telemetry
+  - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
+    value: "true"
+
+# Extra volumes for OpenTelemetry
+extraVolumes:
+  - name: otel-config
+    configMap:
+      name: airflow-otel-config
+
+extraVolumeMounts:
+  - name: otel-config
+    mountPath: /opt/airflow/otel
+    readOnly: true
+
+# Additional packages for OpenTelemetry (if not in custom image)
+extraPipPackages:
+  - "opentelemetry-api"
+  - "opentelemetry-sdk" 
+  - "opentelemetry-exporter-otlp"
+  - "opentelemetry-instrumentation-flask"
+  - "opentelemetry-instrumentation-psycopg2"
+  - "opentelemetry-instrumentation-sqlalchemy"
+  - "opentelemetry-instrumentation-requests"
+
+# ServiceMonitor for Prometheus metrics scraping (disabled until Prometheus Operator is installed)
+serviceMonitor:
+  enabled: false
+  labels:
+    app: airflow  

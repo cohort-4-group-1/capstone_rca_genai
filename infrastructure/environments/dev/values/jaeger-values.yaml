@@ -1,0 +1,98 @@
+# Jaeger configuration for distributed tracing
+# All-in-one deployment suitable for development/testing
+
+# Deploy Jaeger as all-in-one for simplicity
+allInOne:
+  enabled: true
+  image: 
+    repository: jaegertracing/all-in-one
+    tag: "1.57"
+    pullPolicy: IfNotPresent
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Storage configuration (in-memory for development)
+  options:
+    log-level: info
+    memory.max-traces: 50000
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    # UI port
+    ports:
+      - name: http-query
+        port: 16686
+        targetPort: 16686
+        protocol: TCP
+      # Jaeger collector port
+      - name: http-collector
+        port: 14268
+        targetPort: 14268
+        protocol: TCP
+      # OTLP gRPC receiver
+      - name: otlp-grpc
+        port: 4317
+        targetPort: 4317
+        protocol: TCP
+      # OTLP HTTP receiver
+      - name: otlp-http
+        port: 4318
+        targetPort: 4318
+        protocol: TCP
+      # Zipkin compatible endpoint
+      - name: zipkin
+        port: 9411
+        targetPort: 9411
+        protocol: TCP
+
+# Disable other components since we're using all-in-one
+agent:
+  enabled: false
+
+collector:
+  enabled: false
+
+query:
+  enabled: false
+
+# Hotrod example application (disable for production)
+hotrod:
+  enabled: false
+
+# Storage configuration - Using memory for development/testing  
+storage:
+  type: memory
+
+# ServiceMonitor for Prometheus (disabled until Prometheus Operator is installed)
+serviceMonitor:
+  enabled: false
+  labels:
+    app: jaeger
+
+# Ingress configuration (disabled, use port-forward for access)
+ingress:
+  enabled: false
+
+# Enable sampling strategies
+samplingConfig: |
+  {
+    "service_strategies": [
+      {
+        "service": "airflow.*",
+        "type": "probabilistic",
+        "param": 0.5
+      }
+    ],
+    "default_strategy": {
+      "type": "probabilistic",
+      "param": 0.1
+    }
+  }
