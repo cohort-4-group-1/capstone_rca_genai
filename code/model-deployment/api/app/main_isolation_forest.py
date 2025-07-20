@@ -127,3 +127,60 @@ def analyze_log(file: UploadFile = File(...)):
     except Exception as e:
         tb = traceback.format_exc()
         raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}")
+
+
+# --- API: Upload log and get anomaly prediction ---
+@app.post("/analyze-log-anamaly")
+def analyze_log_anamaly(file: UploadFile = File(...)):
+    if not MODEL:
+        raise HTTPException(status_code=500, detail="Isolation Forest model not loaded")
+
+    vectorizer, iforest = MODEL
+
+    try:
+        # Step 1: Read raw log lines
+        lines = [line.decode("utf-8").strip() for line in file.file.readlines() if line.strip()]
+
+        # Step 2: Parse log templates from raw lines
+        templates = parse_templates(lines)
+
+        # Step 3: Group templates into sequences
+        sequences = group_sequences(templates, window_size=10)
+        if not sequences:
+            raise HTTPException(status_code=400, detail="Not enough lines to form sequences")
+
+        # Step 4: Vectorize sequences and predict anomalies
+        X = vectorizer.transform(sequences)
+        preds = iforest.predict(X)              # -1 = anomaly
+        scores = iforest.decision_function(X)   # Higher = more anomalous
+
+        # Step 5: Analyze and return results
+        results = []
+        for i, seq in enumerate(sequences):
+            anomaly_score = float(scores[i])
+            is_anomaly = bool(preds[i] == -1)
+
+            result = {
+                "window_start_line": lines[i],
+                "anomaly_score": anomaly_score,
+                "is_anomaly": is_anomaly
+            }
+
+            if is_anomaly:
+                window_start = max(i, 0)
+                window_end = min(i + 20, len(lines))
+                context_window = lines[window_start:window_end]
+
+                rca_result = analyze_context_with_llm(
+                    anomaly_line=lines[i],
+                    context_lines=context_window
+                )
+                result["rca"] = rca_result
+
+            results.append(result)
+
+        return results
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}")
