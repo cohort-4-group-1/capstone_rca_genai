@@ -49,14 +49,14 @@ try:
     ])
     metrics.set_meter_provider(metrics_provider)
     
-    # Configure logging (NEW - this sends logs directly to OTEL)
+    # Configure logging - Direct OTEL export to Collector
     logger_provider = LoggerProvider(resource=resource)
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(
         OTLPLogExporter(
             endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT",
                              "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/logs",
-            timeout=30,  # Add timeout
-            headers={"Content-Type": "application/x-protobuf"}  # Explicit headers
+            timeout=30,
+            headers={"Content-Type": "application/x-protobuf"}
         )
     ))
     
@@ -66,48 +66,33 @@ try:
 except ImportError:
     OTEL_ENABLED = False
 
-# Hybrid OTEL + Console logging setup (logs appear in both OTEL and kubectl logs)
+# Direct OTEL logging setup - efficient single path to Loki
 logger = logging.getLogger(__name__)
 
-# Configure logger for both OTEL and console output
+# Configure logger with OTEL handler for direct export
 if OTEL_ENABLED:
     try:
         # Create OTEL handler for direct export
         otel_handler = LoggingHandler(logger_provider=logger_provider)
         
-        # Add OTEL handler WITHOUT clearing existing handlers
+        # IMPORTANT: Only use OTEL handler - no file logging to avoid redundancy
+        logger.handlers.clear()  # Remove any existing handlers
         logger.addHandler(otel_handler)
+        logger.propagate = False  # Prevent propagation to avoid duplicate logs
         
-        # Keep propagation enabled so logs also appear in kubectl logs
-        logger.propagate = True
-        
-        # Set appropriate log level
         logger.setLevel(logging.INFO)
         
-        logger.info("[DAG_ORCHESTRATOR] Hybrid OTEL + Console logging configured - logs sent to both collector and kubectl logs")
+        logger.info("[DAG_ORCHESTRATOR] Direct OTEL logging configured - single path to Loki")
+        logger.info(f"[DAG_ORCHESTRATOR] Service: airflow-dag-orchestrator, Pod: {os.getenv('HOSTNAME', 'unknown-pod')}")
         
-        # Test OTEL endpoint connectivity
-        try:
-            import requests
-            response = requests.get(f"http://opentelemetry-collector.monitoring.svc.cluster.local:4318/", timeout=5)
-            logger.info(f"[DAG_ORCHESTRATOR] OTEL Collector endpoint reachable: {response.status_code}")
-        except Exception as conn_err:
-            logger.warning(f"[DAG_ORCHESTRATOR] OTEL Collector endpoint not reachable: {conn_err}")
-        
-        # Test OTEL logging by sending a few test logs
-        try:
-            logger.info("[DAG_ORCHESTRATOR] Test OTLP log export - this should appear in Loki")
-            logger.info("[DAG_ORCHESTRATOR] OTEL log pipeline test completed")
-            
-        except Exception as test_err:
-            logger.warning(f"[DAG_ORCHESTRATOR] OTEL logging test failed: {test_err}")
+        # Test logging
+        logger.info("[DAG_ORCHESTRATOR] Test direct OTEL log export to Loki")
+        logger.info("[DAG_ORCHESTRATOR] Direct OTEL logging pipeline active")
             
     except Exception as e:
-        # Fallback to basic logging if OTEL fails
-        logger.warning(f"[DAG_ORCHESTRATOR] OTEL logging failed, falling back to standard logging: {e}")
+        logger.warning(f"[DAG_ORCHESTRATOR] OTEL logging setup failed: {e}")
 else:
-    # Fallback for when OTEL is not available
-    logger.info("[DAG_ORCHESTRATOR] OTEL not available - using standard Python logging")
+    logger.info("[DAG_ORCHESTRATOR] OTEL not available - using standard logging")
 
 def on_dag_success(context):
     """Log DAG success"""
