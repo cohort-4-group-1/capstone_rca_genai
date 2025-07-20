@@ -46,8 +46,12 @@ try:
     # Configure logging (NEW - this sends logs directly to OTEL)
     logger_provider = LoggerProvider(resource=resource)
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(
-        OTLPLogExporter(endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT",
-                       "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/logs")
+        OTLPLogExporter(
+            endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT",
+                             "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/logs",
+            timeout=30,  # Add timeout
+            retry_config=None  # Disable retries for faster debugging
+        )
     ))
     
     meter = metrics.get_meter(__name__)
@@ -75,6 +79,15 @@ if OTEL_ENABLED:
         logger.setLevel(logging.INFO)
         
         logger.info("[DAG_ORCHESTRATOR] Hybrid OTEL + Console logging configured - logs sent to both collector and kubectl logs")
+        
+        # Test OTEL endpoint connectivity
+        try:
+            import requests
+            response = requests.get(f"http://opentelemetry-collector.monitoring.svc.cluster.local:4318/", timeout=5)
+            logger.info(f"[DAG_ORCHESTRATOR] OTEL Collector endpoint reachable: {response.status_code}")
+        except Exception as conn_err:
+            logger.warning(f"[DAG_ORCHESTRATOR] OTEL Collector endpoint not reachable: {conn_err}")
+            
     except Exception as e:
         # Fallback to basic logging if OTEL fails
         logger.warning(f"[DAG_ORCHESTRATOR] OTEL logging failed, falling back to standard logging: {e}")

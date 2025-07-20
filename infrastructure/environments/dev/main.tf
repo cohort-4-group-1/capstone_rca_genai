@@ -815,6 +815,54 @@ module "otel_collector" {
   chart_version = "0.97.1"
 }
 
+# Service for OpenTelemetry Collector DaemonSet
+# The OpenTelemetry Collector Helm chart in DaemonSet mode doesn't create a service by default
+# This service is needed for Airflow to connect to the collector via http://opentelemetry-collector:4318
+resource "kubernetes_service" "opentelemetry_collector" {
+  count      = var.install_otel_collector ? 1 : 0
+  depends_on = [module.otel_collector]
+
+  metadata {
+    name      = "opentelemetry-collector"
+    namespace = "monitoring"
+    labels = {
+      "app.kubernetes.io/name"     = "opentelemetry-collector"
+      "app.kubernetes.io/instance" = "opentelemetry-collector"
+    }
+  }
+
+  spec {
+    type = "ClusterIP"
+
+    port {
+      name        = "otlp-grpc"
+      port        = 4317
+      target_port = 4317
+      protocol    = "TCP"
+    }
+
+    port {
+      name        = "otlp-http"
+      port        = 4318
+      target_port = 4318
+      protocol    = "TCP"
+    }
+
+    port {
+      name        = "metrics"
+      port        = 8889
+      target_port = 8889
+      protocol    = "TCP"
+    }
+
+    selector = {
+      "app.kubernetes.io/name"     = "opentelemetry-collector"
+      "app.kubernetes.io/instance" = "opentelemetry-collector"
+      "component"                  = "agent-collector"
+    }
+  }
+}
+
 #-------------------------------------------------------------
 # Retrain model based on SQS messages
 #-------------------------------------------------------------
