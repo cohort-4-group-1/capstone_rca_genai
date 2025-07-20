@@ -60,11 +60,23 @@ try:
         )
     ))
     
+    # Get tracer and meter for instrumentation
+    tracer = trace.get_tracer(__name__)
     meter = metrics.get_meter(__name__)
-    dag_executions = meter.create_counter("dag_executions_total", description="DAG executions")
+    
+    # Define metrics
+    dag_executions = meter.create_counter("dag_executions_total", description="Total DAG executions")
+    dag_duration = meter.create_histogram("dag_duration_seconds", description="DAG execution duration in seconds")
+    task_executions = meter.create_counter("task_executions_total", description="Total task executions")
+    task_duration = meter.create_histogram("task_duration_seconds", description="Task execution duration in seconds")
+    pipeline_stages = meter.create_counter("pipeline_stages_total", description="Pipeline stages completed")
+    
     OTEL_ENABLED = True
 except ImportError:
     OTEL_ENABLED = False
+    # Create dummy objects for when OTEL is not available
+    tracer = None
+    meter = None
 
 # Direct OTEL logging setup - efficient single path to Loki
 logger = logging.getLogger(__name__)
@@ -82,30 +94,101 @@ if OTEL_ENABLED:
         
         logger.setLevel(logging.INFO)
         
+        # Wait a moment for any initialization to complete
+        import time
+        time.sleep(0.1)
+        
         logger.info("[DAG_ORCHESTRATOR] Direct OTEL logging configured - single path to Loki")
         logger.info(f"[DAG_ORCHESTRATOR] Service: airflow-dag-orchestrator, Pod: {os.getenv('HOSTNAME', 'unknown-pod')}")
         
-        # Test logging
-        logger.info("[DAG_ORCHESTRATOR] Test direct OTEL log export to Loki")
-        logger.info("[DAG_ORCHESTRATOR] Direct OTEL logging pipeline active")
+        # Force immediate flush
+        otel_handler.flush()
+        
+        print(f"[DEBUG] OTEL logging configured successfully - endpoint: {os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://opentelemetry-collector.monitoring.svc.cluster.local:4318')}")
             
     except Exception as e:
+        print(f"[ERROR] OTEL logging setup failed: {e}")
         logger.warning(f"[DAG_ORCHESTRATOR] OTEL logging setup failed: {e}")
 else:
     logger.info("[DAG_ORCHESTRATOR] OTEL not available - using standard logging")
 
 def on_dag_success(context):
-    """Log DAG success"""
-    logger.info(f"[DAG_ORCHESTRATOR] DAG completed successfully - run_id={context.get('run_id')}")
-    if OTEL_ENABLED:
-        dag_executions.add(1, {"status": "success"})
+    """Log DAG success with comprehensive observability"""
+    run_id = context.get('run_id')
+    dag_id = context.get('dag').dag_id
+    start_date = context.get('data_interval_start')
+    end_date = context.get('data_interval_end')
+    
+    # Calculate duration if possible
+    duration = None
+    if start_date and end_date:
+        duration = (end_date - start_date).total_seconds()
+    
+    # Tracing
+    if OTEL_ENABLED and tracer:
+        with tracer.start_as_current_span("dag_success") as span:
+            span.set_attributes({
+                "dag.id": dag_id,
+                "dag.run_id": run_id,
+                "dag.status": "success",
+                "dag.duration_seconds": duration or 0,
+                "k8s.pod.name": os.getenv("HOSTNAME", "unknown-pod")
+            })
+            
+            # Logging
+            logger.info(f"[DAG_ORCHESTRATOR] DAG completed successfully - run_id={run_id} duration={duration}s")
+            
+            # Metrics
+            dag_executions.add(1, {
+                "status": "success", 
+                "dag_id": dag_id,
+                "pod_name": os.getenv("HOSTNAME", "unknown-pod")
+            })
+            
+            if duration:
+                dag_duration.record(duration, {
+                    "status": "success",
+                    "dag_id": dag_id
+                })
+    else:
+        logger.info(f"[DAG_ORCHESTRATOR] DAG completed successfully - run_id={run_id}")
+    
+    print(f"[DEBUG] DAG success logged via OTEL - run_id={run_id} duration={duration}s")
 
 def on_dag_failure(context):
-    """Log DAG failure"""
+    """Log DAG failure with comprehensive observability"""
     error = str(context.get('exception', 'Unknown'))
-    logger.error(f"[DAG_ORCHESTRATOR] DAG execution failed - run_id={context.get('run_id')} error={error}")
-    if OTEL_ENABLED:
-        dag_executions.add(1, {"status": "failure"})
+    run_id = context.get('run_id')
+    dag_id = context.get('dag').dag_id
+    task_id = context.get('task_instance', {}).task_id if context.get('task_instance') else 'unknown'
+    
+    # Tracing
+    if OTEL_ENABLED and tracer:
+        with tracer.start_as_current_span("dag_failure") as span:
+            span.set_attributes({
+                "dag.id": dag_id,
+                "dag.run_id": run_id,
+                "dag.status": "failure",
+                "dag.error": error,
+                "dag.failed_task": task_id,
+                "k8s.pod.name": os.getenv("HOSTNAME", "unknown-pod")
+            })
+            span.set_status(trace.Status(trace.StatusCode.ERROR, error))
+            
+            # Logging
+            logger.error(f"[DAG_ORCHESTRATOR] DAG execution failed - run_id={run_id} task={task_id} error={error}")
+            
+            # Metrics
+            dag_executions.add(1, {
+                "status": "failure", 
+                "dag_id": dag_id,
+                "failed_task": task_id,
+                "pod_name": os.getenv("HOSTNAME", "unknown-pod")
+            })
+    else:
+        logger.error(f"[DAG_ORCHESTRATOR] DAG execution failed - run_id={run_id} error={error}")
+    
+    print(f"[DEBUG] DAG failure logged via OTEL - run_id={run_id} error={error}")
 
 # =============================================================================
 # DAG DEFINITION - Clean and Simple
@@ -117,17 +200,40 @@ with DAG(
     schedule_interval=None,
     catchup=False,
     is_paused_upon_creation=False,
-    tags=["orchestrator", "otel-instrumented"],
+    tags=["orchestrator", "otel-instrumented", "observability"],
     on_success_callback=on_dag_success,
     on_failure_callback=on_dag_failure
 ) as dag:
 
-    # Log DAG start
-    logger.info("[DAG_ORCHESTRATOR] RCA Pipeline Orchestrator initialized")
+    # Initialize DAG with tracing
+    if OTEL_ENABLED and tracer:
+        with tracer.start_as_current_span("dag_initialization") as span:
+            span.set_attributes({
+                "dag.id": "dag_log_rca_orchestrator",
+                "dag.type": "orchestrator",
+                "dag.stages": 3,
+                "k8s.pod.name": os.getenv("HOSTNAME", "unknown-pod")
+            })
+            
+            # Log DAG start with enhanced context
+            logger.info("[DAG_ORCHESTRATOR] RCA Pipeline Orchestrator initialized with full observability")
+            logger.info(f"[DAG_ORCHESTRATOR] OTEL instrumentation active - traces, metrics, and logs enabled")
+            
+            span.add_event("dag_initialized", {
+                "stages_planned": 3,
+                "tasks_planned": 7,
+                "observability": "enabled"
+            })
+    else:
+        logger.info("[DAG_ORCHESTRATOR] RCA Pipeline Orchestrator initialized")
 
     # =============================================================================
     # STAGE 1: DATA PREPARATION (Sequential)
     # =============================================================================
+    
+    logger.info("[DAG_ORCHESTRATOR] Defining Stage 1: Data Preparation (Sequential)")
+    if OTEL_ENABLED:
+        pipeline_stages.add(1, {"stage": "data_preparation", "stage_number": 1, "type": "sequential"})
     
     trigger_dag_log_parse = TriggerDagRunOperator(
         task_id="trigger_log_parse",
@@ -138,7 +244,7 @@ with DAG(
         failed_states=['failed']
     )
 
-    logger.info("trigger_log_eda initialized")
+    logger.info("[DAG_ORCHESTRATOR] trigger_log_eda initialized")
     
     trigger_dag_log_eda = TriggerDagRunOperator(
         task_id="trigger_log_eda",
@@ -149,7 +255,7 @@ with DAG(
         failed_states=['failed']
     )
 
-    logger.info("trigger_log_template initialized")
+    logger.info("[DAG_ORCHESTRATOR] trigger_log_template initialized")
 
     trigger_dag_log_template = TriggerDagRunOperator(
         task_id="trigger_log_template",
@@ -160,7 +266,7 @@ with DAG(
         failed_states=['failed']
     )
 
-    logger.info("trigger_log_sequence initialized")
+    logger.info("[DAG_ORCHESTRATOR] trigger_log_sequence initialized")
 
     trigger_dag_log_sequence = TriggerDagRunOperator(
         task_id="trigger_log_sequence",
@@ -175,7 +281,11 @@ with DAG(
     # STAGE 2: MODEL TRAINING (Parallel)
     # =============================================================================
 
-    logger.info("trigger_train_rca_model_clustering_kmeans initialized")
+    logger.info("[DAG_ORCHESTRATOR] Defining Stage 2: Model Training (Parallel)")
+    if OTEL_ENABLED:
+        pipeline_stages.add(1, {"stage": "model_training", "stage_number": 2, "type": "parallel"})
+
+    logger.info("[DAG_ORCHESTRATOR] trigger_train_rca_model_clustering_kmeans initialized")
 
     trigger_dag_log_clustering_kmeans = TriggerDagRunOperator(
         task_id="trigger_train_rca_model_clustering_kmeans",
@@ -186,7 +296,7 @@ with DAG(
         failed_states=['failed']
     )
 
-    logger.info("trigger_train_autoencoder_kmeans_pipeline initialized")
+    logger.info("[DAG_ORCHESTRATOR] trigger_train_autoencoder_kmeans_pipeline initialized")
     trigger_dag_log_deep_network_clustering_kmeans = TriggerDagRunOperator(
         task_id="trigger_train_autoencoder_kmeans_pipeline",
         trigger_dag_id="dag_log_deep_network_clustering_kmeans",
@@ -196,7 +306,7 @@ with DAG(
         failed_states=['failed']
     )
 
-    logger.info("trigger_log_clustering_iforest initialized")
+    logger.info("[DAG_ORCHESTRATOR] trigger_log_clustering_iforest initialized")
     
     trigger_dag_log_clustering_iforest = TriggerDagRunOperator(
         task_id="trigger_log_clustering_iforest",
@@ -211,7 +321,11 @@ with DAG(
     # STAGE 3: NOTIFICATION
     # =============================================================================
     
-    logger.info("trigger_send_sqs_message_dag initialized")
+    logger.info("[DAG_ORCHESTRATOR] Defining Stage 3: Notification")
+    if OTEL_ENABLED:
+        pipeline_stages.add(1, {"stage": "notification", "stage_number": 3, "type": "single"})
+    
+    logger.info("[DAG_ORCHESTRATOR] trigger_send_sqs_message_dag initialized")
 
     trigger_dag_notify_model_updates = TriggerDagRunOperator(
         task_id="trigger_send_sqs_message",
@@ -234,6 +348,27 @@ with DAG(
         trigger_dag_log_clustering_iforest
     ] >> trigger_dag_notify_model_updates  # Stage 3: Notification
 
-    # Log pipeline structure
-    logger.info("[DAG_ORCHESTRATOR] Pipeline structure defined - 3 stages: data_preparation -> model_training -> notification")
+    # Enhanced pipeline structure logging with observability
+    if OTEL_ENABLED and tracer:
+        with tracer.start_as_current_span("pipeline_structure_defined") as span:
+            span.set_attributes({
+                "pipeline.stages": 3,
+                "pipeline.total_tasks": 7,
+                "pipeline.parallel_tasks": 3,
+                "pipeline.sequential_tasks": 4,
+                "pipeline.type": "ml_rca_pipeline"
+            })
+            
+            logger.info("[DAG_ORCHESTRATOR] Pipeline structure defined with full observability")
+            logger.info("[DAG_ORCHESTRATOR] 3 stages: data_preparation -> model_training -> notification")
+            logger.info(f"[DAG_ORCHESTRATOR] Total tasks: 7 (4 sequential, 3 parallel)")
+            logger.info(f"[DAG_ORCHESTRATOR] Observability: logs->OTEL->Loki, traces->OTEL->Jaeger, metrics->OTEL->Prometheus")
+            
+            span.add_event("pipeline_ready", {
+                "dag_id": "dag_log_rca_orchestrator",
+                "observability_configured": True,
+                "single_path_logging": True
+            })
+    else:
+        logger.info("[DAG_ORCHESTRATOR] Pipeline structure defined - 3 stages: data_preparation -> model_training -> notification")
 
