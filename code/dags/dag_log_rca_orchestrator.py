@@ -76,6 +76,14 @@ try:
         description="Task duration"
     )
     
+    # Test metric to verify OTEL pipeline works (recorded immediately)
+    dag_parse_counter = meter.create_counter(
+        name="dag_parse_total",
+        description="Total DAG parse events"
+    )
+    # Record immediately to test the pipeline
+    dag_parse_counter.add(1, {"dag_id": "dag_log_rca_orchestrator", "status": "parsed"})
+    
     OTEL_ENABLED = True
 except ImportError as e:
     OTEL_ENABLED = False
