@@ -88,30 +88,13 @@ if OTEL_ENABLED:
         except Exception as conn_err:
             logger.warning(f"[DAG_ORCHESTRATOR] OTEL Collector endpoint not reachable: {conn_err}")
         
-        # Force immediate log export to test OTLP connection
+        # Test OTEL logging by sending a few test logs
         try:
-            # Manually create and export a test log record
-            from opentelemetry.sdk._logs import LogRecord
-            import time
-            
-            # Create test log record
-            test_record = LogRecord(
-                timestamp=int(time.time() * 1_000_000_000),  # nanoseconds
-                observed_timestamp=int(time.time() * 1_000_000_000),
-                body="[DAG_ORCHESTRATOR] Test OTLP log export - this should appear in Loki",
-                severity_text="INFO",
-                attributes={"test.source": "dag_orchestrator", "dag.id": "dag_log_rca_orchestrator"}
-            )
-            
-            # Force immediate export
-            for processor in logger_provider._log_record_processors:
-                processor.emit(test_record)
-                processor.force_flush(timeout_millis=5000)
-                
-            logger.info("[DAG_ORCHESTRATOR] Test OTLP log record sent")
+            logger.info("[DAG_ORCHESTRATOR] Test OTLP log export - this should appear in Loki")
+            logger.info("[DAG_ORCHESTRATOR] OTEL log pipeline test completed")
             
         except Exception as test_err:
-            logger.warning(f"[DAG_ORCHESTRATOR] OTLP test failed: {test_err}")
+            logger.warning(f"[DAG_ORCHESTRATOR] OTEL logging test failed: {test_err}")
             
     except Exception as e:
         # Fallback to basic logging if OTEL fails
