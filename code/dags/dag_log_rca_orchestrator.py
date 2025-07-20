@@ -49,8 +49,7 @@ try:
         OTLPLogExporter(
             endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT",
                              "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/logs",
-            timeout=30,  # Add timeout
-            retry_config=None  # Disable retries for faster debugging
+            timeout=30  # Add timeout
         )
     ))
     
