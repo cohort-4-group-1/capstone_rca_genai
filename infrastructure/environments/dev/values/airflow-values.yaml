@@ -13,6 +13,13 @@ dags:
     depth: 1 
 
 workers:
+  # Add worker-specific environment for observability
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-worker"
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.name=airflow-worker,service.version=2.10.5,deployment.environment=dev,k8s.namespace.name=airflow,component=worker"
+  
   hpa:
     enabled: false
     minReplicaCount: 2
@@ -46,6 +53,13 @@ workers:
     size: 5Gi  # Reduced from 100Gi default - for worker logs/temp data
     storageClassName: gp3          
 webserver:
+  # Add webserver-specific environment for observability
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-webserver"
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.name=airflow-webserver,service.version=2.10.5,deployment.environment=dev,k8s.namespace.name=airflow,component=webserver"
+  
   serviceAccount:      
       # Specifies whether a ServiceAccount should be created
       create: true
@@ -59,6 +73,13 @@ webserver:
     type: ClusterIP
     
 scheduler:
+  # Add scheduler-specific environment for observability
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-scheduler"
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.name=airflow-scheduler,service.version=2.10.5,deployment.environment=dev,k8s.namespace.name=airflow,component=scheduler"
+  
   serviceAccount:
     create: true
     name: airflow-scheduler-test
@@ -103,7 +124,7 @@ config:
   metrics:
     # Enable statsd metrics
     statsd_on: true
-    statsd_host: opentelemetry-collector
+    statsd_host: opentelemetry-collector.monitoring.svc.cluster.local
     statsd_port: 8125
     statsd_prefix: airflow
 
@@ -118,23 +139,24 @@ config:
 
 # Environment variables for OpenTelemetry
 env:
-  # OpenTelemetry configuration
-  - name: OTEL_SERVICE_NAME
-    value: "airflow"
+  # OpenTelemetry configuration (global - overridden by component-specific configs)
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: "http://opentelemetry-collector:4318"
+    value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
   - name: OTEL_EXPORTER_OTLP_PROTOCOL
     value: "http/protobuf"
-  - name: OTEL_RESOURCE_ATTRIBUTES
-    value: "service.name=airflow,service.version=2.10.5,deployment.environment=dev"
   - name: OTEL_TRACES_EXPORTER
     value: "otlp"
   - name: OTEL_METRICS_EXPORTER
     value: "otlp"
   - name: OTEL_LOGS_EXPORTER
-    value: "otlp"  # Now using OTEL for unified telemetry
+    value: "otlp"
   - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
     value: "true"
+  # Add worker-specific attributes
+  - name: AIRFLOW_CTX_DAG_OWNER
+    value: "airflow"
+  - name: AIRFLOW_CTX_DAG_ID
+    value: "system"
 
 # Extra volumes for OpenTelemetry
 extraVolumes:
