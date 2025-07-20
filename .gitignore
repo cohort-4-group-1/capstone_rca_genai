@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+*.DS_Store
 
 # Distribution / packaging
 .Python
@@ -179,3 +180,11 @@ cython_debug/
 # terraform.*
 .gradio/*
 .gradio*
+
+*.tfplan
+*.tfstate
+*.tfstate.backup
+*.tfdestroyplan
+
+lambda_function_payload.zip
+s3_data/
