@@ -13,12 +13,12 @@ dags:
     depth: 1 
 
 workers:
-  # Add worker-specific environment for observability
+  # Simple worker environment for observability
   env:
     - name: OTEL_SERVICE_NAME
       value: "airflow-worker"
-    - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.name=airflow-worker,service.version=2.10.5,deployment.environment=dev,k8s.namespace.name=airflow,component=worker"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
   
   hpa:
     enabled: false
@@ -51,14 +51,29 @@ workers:
   persistence:
     enabled: true
     size: 5Gi  # Reduced from 100Gi default - for worker logs/temp data
-    storageClassName: gp3          
+    storageClassName: gp3
+  
+  # Simple worker environment for observability
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-worker"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "http/protobuf"
+    - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"          
 webserver:
-  # Add webserver-specific environment for observability
+  # Simple webserver environment for observability
   env:
     - name: OTEL_SERVICE_NAME
       value: "airflow-webserver"
-    - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.name=airflow-webserver,service.version=2.10.5,deployment.environment=dev,k8s.namespace.name=airflow,component=webserver"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "http/protobuf"
+    - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"
   
   serviceAccount:      
       # Specifies whether a ServiceAccount should be created
@@ -73,12 +88,16 @@ webserver:
     type: ClusterIP
     
 scheduler:
-  # Add scheduler-specific environment for observability
+  # Simple scheduler environment for observability
   env:
     - name: OTEL_SERVICE_NAME
       value: "airflow-scheduler"
-    - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.name=airflow-scheduler,service.version=2.10.5,deployment.environment=dev,k8s.namespace.name=airflow,component=scheduler"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "http/protobuf"
+    - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"
   
   serviceAccount:
     create: true
@@ -137,47 +156,17 @@ config:
     # Remote logging (disabled since we use OpenTelemetry Collector)
     remote_logging: false
 
-# Environment variables for OpenTelemetry
+# Simple environment variables for OpenTelemetry
 env:
-  # OpenTelemetry configuration (global - overridden by component-specific configs)
+  # Just the basic OTEL endpoint
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
-  - name: OTEL_EXPORTER_OTLP_PROTOCOL
-    value: "http/protobuf"
-  - name: OTEL_TRACES_EXPORTER
-    value: "otlp"
-  - name: OTEL_METRICS_EXPORTER
-    value: "otlp"
-  - name: OTEL_LOGS_EXPORTER
-    value: "otlp"
-  - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
-    value: "true"
-  # Add worker-specific attributes
-  - name: AIRFLOW_CTX_DAG_OWNER
-    value: "airflow"
-  - name: AIRFLOW_CTX_DAG_ID
-    value: "system"
 
-# Extra volumes for OpenTelemetry
-extraVolumes:
-  - name: otel-config
-    configMap:
-      name: airflow-otel-config
-
-extraVolumeMounts:
-  - name: otel-config
-    mountPath: /opt/airflow/otel
-    readOnly: true
-
-# Additional packages for OpenTelemetry (if not in custom image)
+# Basic packages for OpenTelemetry
 extraPipPackages:
   - "opentelemetry-api"
   - "opentelemetry-sdk" 
   - "opentelemetry-exporter-otlp"
-  - "opentelemetry-instrumentation-flask"
-  - "opentelemetry-instrumentation-psycopg2"
-  - "opentelemetry-instrumentation-sqlalchemy"
-  - "opentelemetry-instrumentation-requests"
 
 # ServiceMonitor for Prometheus metrics scraping (disabled until Prometheus Operator is installed)
 serviceMonitor:

@@ -33,12 +33,15 @@ try:
     ))
     trace.set_tracer_provider(trace_provider)
     
-    # Configure metrics
+    # Configure metrics with correct endpoint from environment
+    metrics_endpoint = os.getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", 
+                                os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", 
+                                        "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/metrics")
+    
     metrics_provider = MeterProvider(resource=resource, metric_readers=[
         PeriodicExportingMetricReader(
-            OTLPMetricExporter(endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT",
-                             "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/metrics"),
-            export_interval_millis=5000
+            OTLPMetricExporter(endpoint=metrics_endpoint),
+            export_interval_millis=10000  # Export every 10 seconds
         )
     ])
     metrics.set_meter_provider(metrics_provider)
@@ -57,9 +60,17 @@ try:
     tracer = trace.get_tracer(__name__)
     meter = metrics.get_meter(__name__)
     
-    # Simple metrics
-    dag_counter = meter.create_counter("dag_runs_total", description="Total DAG runs")
-    task_duration = meter.create_histogram("task_duration_seconds", description="Task duration")
+    # Simple metrics with correct naming
+    dag_counter = meter.create_counter(
+        name="dag_runs_total", 
+        description="Total DAG runs",
+        unit="1"
+    )
+    task_duration = meter.create_histogram(
+        name="task_duration_seconds", 
+        description="Task execution duration in seconds",
+        unit="s"
+    )
     
     OTEL_ENABLED = True
 except ImportError:
@@ -81,6 +92,8 @@ if OTEL_ENABLED:
         
         logger.info("[DAG_ORCHESTRATOR] OTEL logging configured")
         print(f"[DEBUG] OTEL endpoint: {os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://opentelemetry-collector.monitoring.svc.cluster.local:4318')}")
+        print(f"[DEBUG] OTEL metrics endpoint: {os.getenv('OTEL_EXPORTER_OTLP_METRICS_ENDPOINT', 'Not Set')}")
+        print(f"[DEBUG] DAG metrics created: dag_runs_total, task_duration_seconds")
     except Exception as e:
         print(f"[ERROR] OTEL logging setup failed: {e}")
 else:
@@ -94,7 +107,9 @@ def on_dag_success(context):
         with tracer.start_as_current_span("dag_success") as span:
             trace_id = format(span.get_span_context().trace_id, '032x')
             logger.info(f"[DAG_ORCHESTRATOR] Pipeline completed successfully - run_id={run_id} trace_id={trace_id}")
-            dag_counter.add(1, {"status": "success"})
+            # Record metric
+            dag_counter.add(1, {"status": "success", "dag_id": "dag_log_rca_orchestrator"})
+            print(f"[DEBUG] Recorded dag_runs_total metric: status=success")
     else:
         logger.info(f"[DAG_ORCHESTRATOR] Pipeline completed successfully - run_id={run_id}")
 
@@ -107,7 +122,9 @@ def on_dag_failure(context):
         with tracer.start_as_current_span("dag_failure") as span:
             trace_id = format(span.get_span_context().trace_id, '032x')
             logger.error(f"[DAG_ORCHESTRATOR] Pipeline failed - run_id={run_id} trace_id={trace_id} error={error}")
-            dag_counter.add(1, {"status": "failure"})
+            # Record metric
+            dag_counter.add(1, {"status": "failure", "dag_id": "dag_log_rca_orchestrator"})
+            print(f"[DEBUG] Recorded dag_runs_total metric: status=failure")
     else:
         logger.error(f"[DAG_ORCHESTRATOR] Pipeline failed - run_id={run_id} error={error}")
 
@@ -125,7 +142,9 @@ def on_task_success(context):
         with tracer.start_as_current_span("task_success") as span:
             trace_id = format(span.get_span_context().trace_id, '032x')
             logger.info(f"[DAG_ORCHESTRATOR] Task completed: {task_id} - {duration:.1f}s - trace_id={trace_id}")
-            task_duration.record(duration, {"task": task_id, "status": "success"})
+            # Record metric
+            task_duration.record(duration, {"task": task_id, "status": "success", "dag_id": "dag_log_rca_orchestrator"})
+            print(f"[DEBUG] Recorded task_duration_seconds metric: {task_id}={duration:.1f}s")
     else:
         logger.info(f"[DAG_ORCHESTRATOR] Task completed: {task_id} - {duration:.1f}s")
 
