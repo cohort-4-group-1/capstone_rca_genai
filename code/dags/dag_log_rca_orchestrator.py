@@ -22,7 +22,13 @@ try:
     # Minimal OTEL setup
     resource = Resource.create({
         "service.name": "airflow-dag-orchestrator",
-        "dag.id": "dag_log_rca_orchestrator"
+        "service.version": "1.0.0",
+        "dag.id": "dag_log_rca_orchestrator",
+        "k8s.namespace.name": "airflow",  # Set correct namespace
+        "k8s.pod.name": os.getenv("HOSTNAME", "unknown-pod"),
+        "k8s.container.name": "worker",
+        "k8s.cluster.name": "airflow-cluster",
+        "deployment.environment": "production"
     })
     
     # Configure tracing
