@@ -165,18 +165,7 @@ def analyze_log_anamaly(file: UploadFile = File(...)):
                 "anomaly_score": anomaly_score,
                 "is_anomaly": is_anomaly
             }
-
-            if is_anomaly:
-                window_start = max(i, 0)
-                window_end = min(i + 20, len(lines))
-                context_window = lines[window_start:window_end]
-
-                rca_result = analyze_context_with_llm(
-                    anomaly_line=lines[i],
-                    context_lines=context_window
-                )
-                result["rca"] = rca_result
-
+            
             results.append(result)
 
         return results
