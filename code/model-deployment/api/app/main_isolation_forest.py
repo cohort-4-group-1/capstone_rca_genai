@@ -99,6 +99,8 @@ def analyze_log(file: UploadFile = File(...)):
 
         # Step 5: Analyze and return results
         results = []
+        first_anomaly_found = False
+
         for i, seq in enumerate(sequences):
             anomaly_score = float(scores[i])
             is_anomaly = bool(preds[i] == -1)
@@ -109,7 +111,7 @@ def analyze_log(file: UploadFile = File(...)):
                 "is_anomaly": is_anomaly
             }
 
-            if is_anomaly:
+            if is_anomaly and not first_anomaly_found:
                 window_start = max(i, 0)
                 window_end = min(i + 20, len(lines))
                 context_window = lines[window_start:window_end]
@@ -119,6 +121,7 @@ def analyze_log(file: UploadFile = File(...)):
                     context_lines=context_window
                 )
                 result["rca"] = rca_result
+                first_anomaly_found = True
 
             results.append(result)
 
