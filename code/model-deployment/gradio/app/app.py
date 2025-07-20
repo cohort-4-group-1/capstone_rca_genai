@@ -1,7 +1,7 @@
 import gradio as gr
 import requests
 
-API_URL = "http://localhost:9000/analyze-log"
+API_URL = "http://logbert-api.api.svc.cluster.local:9000/analyze-log"
 
 def call_logbert_api(file_path_str):
     try:
