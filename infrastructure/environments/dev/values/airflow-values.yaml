@@ -13,13 +13,6 @@ dags:
     depth: 1 
 
 workers:
-  # Simple worker environment for observability
-  env:
-    - name: OTEL_SERVICE_NAME
-      value: "airflow-worker"
-    - name: OTEL_EXPORTER_OTLP_ENDPOINT
-      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
-  
   hpa:
     enabled: false
     minReplicaCount: 2
@@ -53,7 +46,7 @@ workers:
     size: 5Gi  # Reduced from 100Gi default - for worker logs/temp data
     storageClassName: gp3
   
-  # Simple worker environment for observability
+  # Simple worker environment for observability (FIXED - removed duplicate)
   env:
     - name: OTEL_SERVICE_NAME
       value: "airflow-worker"
