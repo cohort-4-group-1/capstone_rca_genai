@@ -6,7 +6,7 @@ mode: daemonset
 # Image configuration
 image:
   repository: otel/opentelemetry-collector-contrib
-  tag: "0.130.0"
+  tag: "0.104.0"
 
 # Resources
 resources:
