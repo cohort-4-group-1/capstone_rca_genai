@@ -15,6 +15,7 @@ import configuration
 import requests  # Required for invoking LLM-based context analysis
 from rca_contextual_analysis import contextual_analysis 
 import traceback
+from rca_contextual_analysis_v2 import interactive_contextual_analysis
 
 app = FastAPI()
 
@@ -70,7 +71,7 @@ def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dic
     log_template = " ".join(parse_templates(context_lines))  # generate log sequence from templates
     log_sequence = group_sequences(log_template, window_size=10)
     log_window_text = "\n".join(context_lines)
-    return contextual_analysis(anomaly_line, log_sequence, log_window_text)
+    return interactive_contextual_analysis(anomaly_line, log_sequence, log_window_text)
 
 # --- API: Upload log and get anomaly prediction ---
 @app.post("/analyze-log")
