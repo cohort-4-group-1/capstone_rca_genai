@@ -66,23 +66,29 @@ try:
     tracer = trace.get_tracer(__name__)
     meter = metrics.get_meter(__name__)
     
-    # Simple metrics
-    dag_counter = meter.create_counter(
+    # =============================================================================
+    # WORKING METRICS (VISIBLE IN GRAFANA)
+    # =============================================================================
+    
+    # DAG execution metrics that actually work
+    dag_runs_total = meter.create_counter(
         name="dag_runs_total", 
-        description="Total DAG runs"
+        description="Total DAG runs by status"
     )
-    task_duration = meter.create_histogram(
-        name="task_duration_seconds", 
-        description="Task duration"
+    dag_execution_duration = meter.create_histogram(
+        name="dag_execution_duration_seconds",
+        description="DAG execution time"
     )
     
-    # Test metric to verify OTEL pipeline works (recorded immediately)
-    dag_parse_counter = meter.create_counter(
-        name="dag_parse_total",
-        description="Total DAG parse events"
+    # Task execution metrics that actually work
+    task_duration = meter.create_histogram(
+        name="task_duration_seconds", 
+        description="Task execution time"
     )
-    # Record immediately to test the pipeline
-    dag_parse_counter.add(1, {"dag_id": "dag_log_rca_orchestrator", "status": "parsed"})
+    task_status_total = meter.create_counter(
+        name="task_status_total",
+        description="Task completion status"
+    )
     
     OTEL_ENABLED = True
 except ImportError as e:
@@ -109,34 +115,51 @@ else:
     logger.info("[DAG_ORCHESTRATOR] Standard logging")
 
 def on_dag_success(context):
-    """Simple DAG success logging with trace ID"""
+    """Enhanced DAG success logging with business metrics"""
     run_id = context.get('run_id')
+    dag_instance = context.get('dag_run')
+    
+    # Calculate execution duration for SLA monitoring
+    execution_duration = 0
+    if dag_instance and dag_instance.start_date and dag_instance.end_date:
+        execution_duration = (dag_instance.end_date - dag_instance.start_date).total_seconds()
     
     if OTEL_ENABLED and tracer:
         with tracer.start_as_current_span("dag_success") as span:
             trace_id = format(span.get_span_context().trace_id, '032x')
-            logger.info(f"[DAG_ORCHESTRATOR] Pipeline completed successfully - run_id={run_id} trace_id={trace_id}")
-            # Record metric with explicit attributes
-            dag_counter.add(1, {"status": "success", "dag_id": "dag_log_rca_orchestrator"})
+            logger.info(f"[DAG_ORCHESTRATOR] Pipeline completed successfully - run_id={run_id} trace_id={trace_id} duration={execution_duration:.1f}s")
+            
+            # Record working metrics
+            dag_runs_total.add(1, {"status": "success", "dag_id": "dag_log_rca_orchestrator"})
+            dag_execution_duration.record(execution_duration, {"status": "success", "dag_id": "dag_log_rca_orchestrator"})
     else:
-        logger.info(f"[DAG_ORCHESTRATOR] Pipeline completed successfully - run_id={run_id}")
+        logger.info(f"[DAG_ORCHESTRATOR] Pipeline completed successfully - run_id={run_id} duration={execution_duration:.1f}s")
 
 def on_dag_failure(context):
-    """Simple DAG failure logging with trace ID"""
+    """Enhanced DAG failure logging with business metrics"""
     run_id = context.get('run_id')
     error = str(context.get('exception', 'Unknown'))
+    dag_instance = context.get('dag_run')
+    
+    # Calculate execution duration even for failed runs
+    execution_duration = 0
+    if dag_instance and dag_instance.start_date:
+        end_time = dag_instance.end_date or datetime.now()
+        execution_duration = (end_time - dag_instance.start_date).total_seconds()
     
     if OTEL_ENABLED and tracer:
         with tracer.start_as_current_span("dag_failure") as span:
             trace_id = format(span.get_span_context().trace_id, '032x')
-            logger.error(f"[DAG_ORCHESTRATOR] Pipeline failed - run_id={run_id} trace_id={trace_id} error={error}")
-            # Record metric with explicit attributes
-            dag_counter.add(1, {"status": "failure", "dag_id": "dag_log_rca_orchestrator"})
+            logger.error(f"[DAG_ORCHESTRATOR] Pipeline failed - run_id={run_id} trace_id={trace_id} error={error} duration={execution_duration:.1f}s")
+            
+            # Record working metrics
+            dag_runs_total.add(1, {"status": "failure", "dag_id": "dag_log_rca_orchestrator"})
+            dag_execution_duration.record(execution_duration, {"status": "failure", "dag_id": "dag_log_rca_orchestrator"})
     else:
-        logger.error(f"[DAG_ORCHESTRATOR] Pipeline failed - run_id={run_id} error={error}")
+        logger.error(f"[DAG_ORCHESTRATOR] Pipeline failed - run_id={run_id} error={error} duration={execution_duration:.1f}s")
 
 def on_task_success(context):
-    """Simple task success logging with timing"""
+    """Enhanced task success logging with business metrics"""
     task_instance = context.get('task_instance')
     task_id = task_instance.task_id
     
@@ -149,8 +172,11 @@ def on_task_success(context):
         with tracer.start_as_current_span("task_success") as span:
             trace_id = format(span.get_span_context().trace_id, '032x')
             logger.info(f"[DAG_ORCHESTRATOR] Task completed: {task_id} - {duration:.1f}s - trace_id={trace_id}")
-            # Record metric with explicit attributes
+            
+            # Record working task metrics
             task_duration.record(duration, {"task": task_id, "status": "success", "dag_id": "dag_log_rca_orchestrator"})
+            task_status_total.add(1, {"task": task_id, "status": "success", "dag_id": "dag_log_rca_orchestrator"})
+            
     else:
         logger.info(f"[DAG_ORCHESTRATOR] Task completed: {task_id} - {duration:.1f}s")
 
