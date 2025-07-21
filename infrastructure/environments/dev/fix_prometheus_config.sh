@@ -8,6 +8,7 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=prometheus,app.
 # Check if the extraScrapeConfigs are properly applied
 if ! kubectl get configmap prometheus-server -n monitoring -o yaml | grep -q "opentelemetry-collector"; then
   echo "Prometheus extraScrapeConfigs not found, applying manual patch..."
+  echo "Note: This should be automatic with Terraform. Check if prometheus-values.yaml is being applied correctly."
   
   # Apply the scrape configuration patch
   kubectl patch configmap prometheus-server -n monitoring --patch='
@@ -73,3 +74,10 @@ data:
 else
   echo "Prometheus extraScrapeConfigs already properly configured."
 fi
+
+echo ""
+echo "=== PERMANENT SOLUTION ==="
+echo "To avoid manual patches, ensure Terraform properly applies prometheus-values.yaml:"
+echo "1. Run: terraform apply -target=module.prometheus[0] -replace=module.prometheus[0].helm_release.this[0]"
+echo "2. This forces Helm to recreate the Prometheus release with correct values"
+echo "3. The values/prometheus-values.yaml file already contains the correct extraScrapeConfigs"
