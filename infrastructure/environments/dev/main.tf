@@ -758,11 +758,6 @@ module "mlflow" {
   values_files   = ["${path.module}/values/mlflow-values.yaml"]
 }
 
-resource "kubernetes_namespace" "api" {
-  metadata {
-    name = "api"
-  }
-}
 
 # Loki for log aggregation
 module "loki" {
