@@ -858,6 +858,28 @@ resource "kubernetes_service" "opentelemetry_collector" {
   }
 }
 
+# Ensure Prometheus scrape configuration is properly applied
+# This fixes the issue where Helm values don't always apply the extraScrapeConfigs correctly
+resource "null_resource" "fix_prometheus_config" {
+  count = var.install_prometheus && var.install_otel_collector ? 1 : 0
+  
+  depends_on = [
+    module.prometheus,
+    module.otel_collector,
+    kubernetes_service.opentelemetry_collector
+  ]
+
+  provisioner "local-exec" {
+    command = "chmod +x ${path.module}/fix_prometheus_config.sh && ${path.module}/fix_prometheus_config.sh"
+  }
+
+  # Trigger when dependencies change
+  triggers = {
+    prometheus_deployed     = var.install_prometheus ? "deployed" : "not_deployed"
+    otel_collector_deployed = var.install_otel_collector ? "deployed" : "not_deployed"
+  }
+}
+
 #-------------------------------------------------------------
 # Retrain model based on SQS messages
 #-------------------------------------------------------------
