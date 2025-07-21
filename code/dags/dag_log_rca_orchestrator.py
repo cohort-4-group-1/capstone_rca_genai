@@ -90,11 +90,24 @@ try:
         description="Task completion status"
     )
     
+    # Test metric to verify OTEL is working immediately
+    dag_initialization_counter = meter.create_counter(
+        name="dag_initialization_total",
+        description="DAG initialization count"
+    )
+    
     OTEL_ENABLED = True
+    
+    # Fire test metric immediately when DAG is loaded
+    print("[DAG_ORCHESTRATOR] Firing test metric: dag_initialization_total")
+    dag_initialization_counter.add(1, {"dag_id": "dag_log_rca_orchestrator", "timestamp": str(datetime.now())})
+    print("[DAG_ORCHESTRATOR] Test metric fired successfully")
+    
 except ImportError as e:
     OTEL_ENABLED = False
     tracer = None
     meter = None
+    print(f"[DAG_ORCHESTRATOR] OpenTelemetry not available: {e}")
 
 # Simple logging setup
 logger = logging.getLogger(__name__)
@@ -227,7 +240,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
 
     logger.info("[DAG_ORCHESTRATOR] trigger_log_template initialized")
@@ -238,7 +252,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
 
     logger.info("[DAG_ORCHESTRATOR] trigger_log_sequence initialized")
@@ -249,7 +264,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
 
     # =============================================================================
@@ -266,7 +282,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
 
     logger.info("[DAG_ORCHESTRATOR] trigger_train_autoencoder_kmeans_pipeline initialized")
@@ -276,7 +293,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
 
     logger.info("[DAG_ORCHESTRATOR] trigger_log_clustering_iforest initialized")
@@ -287,7 +305,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
     
     # =============================================================================
@@ -304,7 +323,8 @@ with DAG(
         wait_for_completion=True,
         poke_interval=30,
         allowed_states=['success'], 
-        failed_states=['failed']
+        failed_states=['failed'],
+        on_success_callback=on_task_success
     )
 
     # =============================================================================
