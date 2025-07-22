@@ -71,8 +71,14 @@ else:
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     MAX_LOG_WINDOW_CHARS = 2000
+    MAX_LOG_WINDOW_CHARS = 1000
+    MAX_SEQUENCE_CHARS = 1000
+
     if len(log_window_text) > MAX_LOG_WINDOW_CHARS:
         log_window_text = log_window_text[-MAX_LOG_WINDOW_CHARS:]
+    
+    if len(log_sequence) > MAX_SEQUENCE_CHARS:
+        log_sequence = log_sequence[-MAX_SEQUENCE_CHARS:]
 
     input_vars = {
         "anomaly_line": anomaly_line,

@@ -154,6 +154,7 @@ def analyze_log(file: UploadFile = File(...)):
             # Step 5: Prepare results
             logger.info("Preparing results")
             results = []
+            first_anomaly_found = False
 
             for i, seq in enumerate(sequences):
                 # Ensure is_anomaly is a native Python bool, not numpy.bool_
@@ -165,7 +166,7 @@ def analyze_log(file: UploadFile = File(...)):
                     "is_anomaly": is_anomaly
                 }
 
-                if is_anomaly:
+                if is_anomaly and not first_anomaly_found:
                     logger.info(f"Anomaly detected at line {i} with score {anomaly_score:.4f}")
                     window_start = max(i, 0)
                     window_end = min(i + 20, len(lines))
@@ -178,6 +179,8 @@ def analyze_log(file: UploadFile = File(...)):
                         )
                         logger.info(f"RCA analysis result for anomaly at line {i}: {rca_result}")
                         result["rca"] = rca_result
+                        first_anomaly_found = True
+                        
                     except Exception as rca_err:
                         logger.warning(f"Failed RCA analysis for anomaly at line {i}: {rca_err}")
 
