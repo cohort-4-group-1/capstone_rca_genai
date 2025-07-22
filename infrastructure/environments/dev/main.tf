@@ -751,6 +751,13 @@ module "mlflow" {
   values_files   = ["${path.module}/values/mlflow-values.yaml"]
 }
 
+resource "kubernetes_namespace" "api" {
+  metadata {
+    name = "api"
+  }
+}
+
+
 #-------------------------------------------------------------
 # Retrain model based on SQS messages
 #-------------------------------------------------------------
@@ -1044,6 +1051,22 @@ resource "aws_ecr_repository" "trigger_ecr_repo" {
   # Optional: Add tags
   tags = {
     Name = "RCA Image Repository"
+    Environment = "dev"
+  }
+}
+
+# Create an ECR repository
+resource "aws_ecr_repository" "gradio_ecr_repo" {
+  name                 = "capstone/gradio"  # Replace with your desired repository name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true  # Enable image scanning on push
+  }
+
+  # Optional: Add tags
+  tags = {
+    Name = "Gradio UI Image Repository"
     Environment = "dev"
   }
 }

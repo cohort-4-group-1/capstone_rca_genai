@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.10-slim
 
 
 # Set the working directory in the container
@@ -9,9 +9,10 @@ WORKDIR /code
 COPY ./requirements.txt /code/requirements.txt
 
 
-# Install the dependencies
-RUN python -m pip install --no-cache-dir --upgrade pip && \
+# Install required Python libraries
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /code/requirements.txt
+
 
 
 # Copy the rest of the application code into the container
@@ -19,6 +20,8 @@ COPY ./app /code/app
 
 # Expose the port the app runs on
 EXPOSE 7860
+
+ENV GRADIO_SERVER_NAME="0.0.0.0"
 
 WORKDIR /code/app
 
