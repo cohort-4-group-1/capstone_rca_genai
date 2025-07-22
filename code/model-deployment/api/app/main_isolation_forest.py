@@ -171,4 +171,4 @@ def analyze_log_anamaly(file: UploadFile = File(...)):
 
     except Exception as e:
         tb = traceback.format_exc()
-        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}"       
+        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}")      
