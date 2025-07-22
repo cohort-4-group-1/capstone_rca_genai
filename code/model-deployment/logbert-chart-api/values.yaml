@@ -9,4 +9,9 @@ api:
   image: sujittah/logbert-api
   service:
     port: 9000
+  env:
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ""
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ""
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: ""
 
