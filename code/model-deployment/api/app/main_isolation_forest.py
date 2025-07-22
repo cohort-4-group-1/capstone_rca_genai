@@ -16,31 +16,6 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
-# Setup OTEL logging
-resource = Resource.create({
-    "service.name": "log-analyzer-api",
-    "service.namespace": "anomaly-pipeline",
-})
-
-logger_provider = LoggerProvider(resource=resource)
-logger_provider.add_log_record_processor(
-    BatchLogRecordProcessor(
-        OTLPLogExporter(
-            endpoint=os.getenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/logs"),
-            timeout=10,
-        )
-    )
-)
-otel_handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
-
-# Python logging config
-logger = logging.getLogger("log-analyzer")
-logger.setLevel(logging.INFO)
-logger.addHandler(otel_handler)
-logger.propagate = False
-
-LoggingInstrumentor().instrument(set_logging_format=True)
-
 # FastAPI app
 app = FastAPI()
 FastAPIInstrumentor.instrument_app(app)
@@ -180,7 +155,7 @@ def analyze_log(file: UploadFile = File(...)):
                         logger.info(f"RCA analysis result for anomaly at line {i}: {rca_result}")
                         result["rca"] = rca_result
                         first_anomaly_found = True
-                        
+
                     except Exception as rca_err:
                         logger.warning(f"Failed RCA analysis for anomaly at line {i}: {rca_err}")
 
