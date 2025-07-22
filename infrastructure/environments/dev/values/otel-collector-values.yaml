@@ -194,9 +194,9 @@ config:
     # Export metrics to Prometheus
     prometheus:
       endpoint: "0.0.0.0:8889"
-      namespace: airflow
-      const_labels:
-        cluster: airflow-cluster
+      # namespace: airflow
+      # const_labels:
+      #   cluster: airflow-cluster
     
     # Export logs to Loki
     loki:

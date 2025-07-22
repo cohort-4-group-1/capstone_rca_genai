@@ -53,6 +53,14 @@ data:
       scrape_interval: 30s
       metrics_path: /admin/metrics
       scheme: http
+    # logbert-api metrics
+    - job_name: logbert-api
+      static_configs:
+      - targets:
+        - logbert-api.api.svc.cluster.local:9000
+      scrape_interval: 30s
+      metrics_path: /metrics
+      scheme: http
     alerting:
       alertmanagers:
       - static_configs:
