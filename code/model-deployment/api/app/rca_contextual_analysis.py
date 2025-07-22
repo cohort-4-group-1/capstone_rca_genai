@@ -67,7 +67,7 @@ def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: s
 
     if len(log_sequence) > MAX_SEQUENCE_CHARS:
         log_sequence = log_sequence[-MAX_SEQUENCE_CHARS:]
-        
+         
     input_vars = {
         "anomaly_line": anomaly_line,
         "log_sequence": log_sequence,
