@@ -154,8 +154,10 @@ def analyze_log(file: UploadFile = File(...)):
             # Step 5: Prepare results
             logger.info("Preparing results")
             results = []
+
             for i, seq in enumerate(sequences):
-                is_anomaly = preds[i] == -1
+                # Ensure is_anomaly is a native Python bool, not numpy.bool_
+                is_anomaly = bool(preds[i] == -1)
                 anomaly_score = float(scores[i])
                 result = {
                     "window_start_line": lines[i],
