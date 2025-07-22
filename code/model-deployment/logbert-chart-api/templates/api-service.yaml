@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: logbert-api
+  name: logbert-api-o
 spec:
   type: ClusterIP
   selector:
-    app: logbert-api
+    app: logbert-api-o
   ports:
     - port: {{ .Values.api.service.port }}
       targetPort: {{ .Values.api.service.port }}

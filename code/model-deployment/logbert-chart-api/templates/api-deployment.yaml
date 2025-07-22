@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: logbert-api
+  name: logbert-api-o
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: logbert-api
+      app: logbert-api-o
   template:
     metadata:
       labels:
-        app: logbert-api
+        app: logbert-api-o
     spec:
       serviceAccountName: {{ .Values.global.serviceAccount.name }}
       containers:
