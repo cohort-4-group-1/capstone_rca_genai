@@ -6,7 +6,7 @@ from langchain_community.llms import HuggingFacePipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 # Import OTEL shared instances
-from main_isolation_forest import logger, tracer, meter, OTEL_ENABLED
+from otel import logger, tracer, meter, OTEL_ENABLED
 
 # Prompt template for RCA
 RCA_PROMPT_TEMPLATE = """
