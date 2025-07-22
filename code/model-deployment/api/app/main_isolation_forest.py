@@ -7,6 +7,9 @@ from typing import List
 import configuration
 from rca_contextual_analysis import contextual_analysis
 from otel import logger, tracer, meter, OTEL_ENABLED
+from fastapi.responses import PlainTextResponse
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+import prometheus_client
 
 # OTEL Logging
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
@@ -88,6 +91,7 @@ def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dic
     log_window_text = "\n".join(context_lines)
     logger.info(f"Analyzing context for anomaly line: {anomaly_line}")
     return contextual_analysis(anomaly_line, log_sequence, log_window_text)
+
 
 # --- API: Upload log and get anomaly prediction ---
 @app.post("/analyze-log")
@@ -174,3 +178,12 @@ def analyze_log(file: UploadFile = File(...)):
         if api_request_duration:
             api_request_duration.record(0.0, {"endpoint": "/analyze-log", "status": "error"})
         raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}")
+
+
+# --- API: Prometheus metrics endpoint ---
+@app.get("/metrics")
+def metrics():
+    # Expose all default and custom Prometheus metrics
+    """Endpoint that returns Prometheus metrics in text format for scraping."""
+    logger.info("Metrics endpoint accessed")
+    return PlainTextResponse(generate_latest(prometheus_client.REGISTRY), media_type=CONTENT_TYPE_LATEST)

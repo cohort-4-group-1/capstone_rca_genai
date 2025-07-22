@@ -64,6 +64,11 @@ config:
             static_configs:
               - targets: ['airflow-scheduler:8080']
             metrics_path: '/admin/metrics'
+          # API service metrics (if exposing Prometheus endpoint)
+          - job_name: 'logbert-api'
+            static_configs:
+              - targets: ['logbert-api:9000']
+            metrics_path: '/metrics'  # if your API exposes Prometheus metrics here
     
     # Kubernetes metrics receiver
     k8s_cluster:
