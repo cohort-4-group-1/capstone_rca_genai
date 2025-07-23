@@ -15,13 +15,13 @@ You are given a list of anomalies, where each anomaly has:
 - A raw log context (actual log lines before and after the anomaly).
 
 For each anomaly, analyze the context and respond with a JSON object in this format:
-{
+{{
   "anomaly_line": "...",
   "anomaly_cause": "...",
   "affected_component": "...",
   "severity": "low | medium | high",
   "suggested_action": "..."
-}
+}}
 
 Return a JSON array of such objects — one per anomaly. Keep the response concise, technical, and actionable.
 
@@ -30,6 +30,7 @@ Return a JSON array of such objects — one per anomaly. Keep the response conci
 🔍 Anomalies to analyze:
 {anomaly_list}
 """
+
 
 
 
