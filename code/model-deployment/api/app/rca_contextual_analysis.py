@@ -6,41 +6,31 @@ from langchain_community.llms import HuggingFacePipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import json
 
-RCA_PROMPT_TEMPLATE = """
-You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies. You are given:
+RCA_MULTI_PROMPT_TEMPLATE = """
+You are a cloud infrastructure expert skilled in analyzing OpenStack logs and identifying root causes of anomalies.
 
-1. An anomalous log line that was flagged by a machine learning model.
-2. A log sequence — a list of log templates leading up to the anomaly.
-3. A raw log window — actual log lines before and after the anomaly.
+You are given a list of anomalies, where each anomaly has:
+- An anomalous log line flagged by a machine learning model.
+- A log sequence (template pattern) preceding the anomaly.
+- A raw log context (actual log lines before and after the anomaly).
 
-Your job is to:
-- Identify possible causes of the anomaly.
-- Suggest where the issue might have originated.
-- Keep it concise, technical, and actionable.
-
----
-
-🔴 Suspicious Log Line:
-"{anomaly_line}"
-
-🧩 Log Sequence (Template Pattern):
-"{log_sequence}"
-
-📜 Raw Log Context:
-{log_window_text}
-
----
-
-Please explain the likely root cause or contributing factors, even if speculative.
-Respond in this JSON format:
-
-{{
+For each anomaly, analyze the context and respond with a JSON object in this format:
+{
+  "anomaly_line": "...",
   "anomaly_cause": "...",
   "affected_component": "...",
   "severity": "low | medium | high",
   "suggested_action": "..."
-}}
+}
+
+Return a JSON array of such objects — one per anomaly. Keep the response concise, technical, and actionable.
+
+---
+
+🔍 Anomalies to analyze:
+{anomaly_list}
 """
+
 
 
 # Load model once
@@ -54,27 +44,26 @@ hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer,  max
     temperature=0.7)
 
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
-prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
+prompt = PromptTemplate.from_template(RCA_MULTI_PROMPT_TEMPLATE)
 chain = prompt | llm
 
-def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
-    MAX_LOG_WINDOW_CHARS = 2000
-    MAX_LOG_WINDOW_CHARS = 1000
-    MAX_SEQUENCE_CHARS = 1000
+def contextual_analysis_batch(anomaly_inputs: list) -> list:
+    # Format input
+    blocks = []
+    for idx, anomaly in enumerate(anomaly_inputs):
+        block = f"""---
+        Anomaly #{idx+1}
+        🔴 Log Line: {anomaly['anomaly_line']}
+        🧩 Log Sequence: {anomaly['log_sequence']}
+        📜 Raw Context:
+        {anomaly['log_window_text']}
+        """
+        blocks.append(block)
 
-    if len(log_window_text) > MAX_LOG_WINDOW_CHARS:
-        log_window_text = log_window_text[-MAX_LOG_WINDOW_CHARS:]
+    anomaly_list = "\n".join(blocks)
+    response = chain.invoke({"anomaly_list": anomaly_list})
 
-    if len(log_sequence) > MAX_SEQUENCE_CHARS:
-        log_sequence = log_sequence[-MAX_SEQUENCE_CHARS:]
-         
-    input_vars = {
-        "anomaly_line": anomaly_line,
-        "log_sequence": log_sequence,
-        "log_window_text": log_window_text
-    }
-    response = chain.invoke(input_vars)
     try:
         return json.loads(response)
     except Exception as e:
-        return {"raw_output": response, "error": str(e)}
+        return [{"error": str(e), "raw_output": response}]

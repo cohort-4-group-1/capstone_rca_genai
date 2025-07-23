@@ -13,7 +13,7 @@ import numpy as np
 from typing import List
 import configuration
 import requests  # Required for invoking LLM-based context analysis
-from rca_contextual_analysis import contextual_analysis 
+from rca_contextual_analysis import contextual_analysis_batch 
 import traceback
 
 app = FastAPI()
@@ -65,13 +65,6 @@ def group_sequences(templates: List[str], window_size=10) -> List[str]:
         sequences.append(seq)
     return sequences
 
-# --- Utility: Call LLM-based contextual analyzer ---
-def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dict:
-    log_template = " ".join(parse_templates(context_lines))  # generate log sequence from templates
-    log_sequence = group_sequences(log_template, window_size=10)
-    log_window_text = "\n".join(context_lines)
-    return contextual_analysis(anomaly_line, log_sequence, log_window_text)
-
 # --- API: Upload log and get anomaly prediction ---
 @app.post("/analyze-log")
 def analyze_log(file: UploadFile = File(...)):
@@ -97,36 +90,34 @@ def analyze_log(file: UploadFile = File(...)):
         preds = iforest.predict(X)              # -1 = anomaly
         scores = iforest.decision_function(X)   # Higher = more anomalous
 
-        # Step 5: Analyze and return results
-        results = []
-        first_anomaly_found = False
-
+        anomalies = []
         for i, seq in enumerate(sequences):
-            anomaly_score = float(scores[i])
-            is_anomaly = bool(preds[i] == 1)
-
-            result = {
-                "window_start_line": lines[i],
-                "anomaly_score": anomaly_score,
-                "pred" : preds[i],    
-                "is_anomaly": is_anomaly
-            }
-
-            if is_anomaly and not first_anomaly_found:
+            if preds[i] == -1:
                 window_start = max(i, 0)
                 window_end = min(i + 20, len(lines))
                 context_window = lines[window_start:window_end]
+                anomaly_line = lines[i]
+                log_sequence = " ".join(templates[i:i + 10])
+                log_window_text = "\n".join(context_window)
 
-                rca_result = analyze_context_with_llm(
-                    anomaly_line=lines[i],
-                    context_lines=context_window
-                )
-                result["rca"] = rca_result
-                first_anomaly_found = True
+                anomalies.append({
+                    "anomaly_line": anomaly_line,
+                    "log_sequence": log_sequence,
+                    "log_window_text": log_window_text
+                })
 
-            results.append(result)
+        rca_results = contextual_analysis_batch(anomalies)
+
+        # Combine RCA results with input info
+        results = []
+        for i in range(len(anomalies)):
+            results.append({
+                "anomaly_line": anomalies[i]["anomaly_line"],
+                "rca": rca_results[i] if i < len(rca_results) else {"error": "No RCA result"}
+            })
 
         return results
+
 
     except Exception as e:
         tb = traceback.format_exc()
