@@ -5,6 +5,12 @@ from drain3.template_miner import TemplateMiner
 from drain3.file_persistence import FilePersistence
 from typing import List
 import configuration
+
+import requests  # Required for invoking LLM-based context analysis
+from rca_contextual_analysis import contextual_analysis_batch 
+import traceback
+
+
 from rca_contextual_analysis import contextual_analysis
 from otel import logger, tracer, meter, OTEL_ENABLED
 from fastapi.responses import PlainTextResponse
@@ -20,6 +26,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
 # FastAPI app
+
 app = FastAPI()
 FastAPIInstrumentor.instrument_app(app)
 
@@ -84,6 +91,7 @@ def group_sequences(templates: List[str], window_size=10) -> List[str]:
         sequences.append(" ".join(templates[i:i + window_size]))
     return sequences
 
+
 # --- Utility: Call LLM-based contextual analyzer ---
 def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dict:
     log_template = " ".join(parse_templates(context_lines))
@@ -91,6 +99,7 @@ def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dic
     log_window_text = "\n".join(context_lines)
     logger.info(f"Analyzing context for anomaly line: {anomaly_line}")
     return contextual_analysis(anomaly_line, log_sequence, log_window_text)
+
 
 
 # --- API: Upload log and get anomaly prediction ---
@@ -105,6 +114,65 @@ def analyze_log(file: UploadFile = File(...)):
         if api_errors_total:
             api_errors_total.add(1, {"endpoint": "/analyze-log", "error": "model_not_loaded"})
         raise HTTPException(status_code=500, detail="Model not loaded")
+    try:
+        # Step 1: Read raw log lines
+        lines = [line.decode("utf-8").strip() for line in file.file.readlines() if line.strip()]
+
+        # Step 2: Parse log templates from raw lines
+        templates = parse_templates(lines)
+
+        # Step 3: Group templates into sequences
+        sequences = group_sequences(templates, window_size=10)
+        if not sequences:
+            raise HTTPException(status_code=400, detail="Not enough lines to form sequences")
+
+        # Step 4: Vectorize sequences and predict anomalies
+        X = vectorizer.transform(sequences)
+        preds = iforest.predict(X)              # -1 = anomaly
+        scores = iforest.decision_function(X)   # Higher = more anomalous
+
+        anomalies = []
+        for i, seq in enumerate(sequences):
+            if preds[i] == -1:
+                window_start = max(i, 0)
+                window_end = min(i + 20, len(lines))
+                context_window = lines[window_start:window_end]
+                anomaly_line = lines[i]
+                log_sequence = " ".join(templates[i:i + 10])
+                log_window_text = "\n".join(context_window)
+
+                anomalies.append({
+                    "anomaly_line": anomaly_line,
+                    "log_sequence": log_sequence,
+                    "log_window_text": log_window_text
+                })
+
+        rca_results = contextual_analysis_batch(anomalies)
+
+        # Combine RCA results with input info
+        results = []
+        for i in range(len(anomalies)):
+            results.append({
+                "anomaly_line": anomalies[i]["anomaly_line"],
+                "rca": rca_results[i] if i < len(rca_results) else {"error": "No RCA result"}
+            })
+
+        return results
+
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Log analysis failed: {str(e)}\n{tb}")
+
+
+# --- API: Upload log and get anomaly prediction ---
+@app.post("/analyze-log-anamaly")
+def analyze_log_anamaly(file: UploadFile = File(...)):
+    if not MODEL:
+        raise HTTPException(status_code=500, detail="Isolation Forest model not loaded")
+
+    vectorizer, iforest = MODEL
+
     try:
         # --- Custom OTEL trace span for log analysis ---
         with tracer.start_as_current_span("analyze_log_request", attributes={"endpoint": "/analyze-log"}):

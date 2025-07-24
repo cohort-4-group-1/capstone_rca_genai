@@ -60,7 +60,7 @@ eksctl create cluster --name airflow --region us-east-1 --version 1.32   --nodeg
 
 eksctl delete cluster --name airflow-eks --region us-east-1
 
-aws eks --region us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
+aws eks --  us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
 
 helm install airflow bitnami/airflow --namespace  airflow -f ./values.yaml
 
@@ -80,6 +80,12 @@ docker build -t dask/dask-custom:2023.12.1 .
 docker tag dask/dask-custom:2023.12.1 sujittah/dask-custom:2023.12.1
 docker push sujittah/dask-custom:2023.12.1
 
+
+kubectl port-forward pod/airflow-webserver-75dcbd77db-n7s6d 8080:8080 -n airflow        
+kubectl port-forward pod/mlflow-d8f567dff-zrnf9 5000:5000 -n mlflow   
+kubectl port-forward pod/logbert-api-d58c678d5-8h8xg  9000:9000 -n api
+kubectl port-forward pod/logbert-ui-594f4c5d66-d7xt9  7860:7860 -n api
+
 kubectl port-forward pod/airflow-webserver-759fccf694-ftk5n 8080:8080 -n airflow        
 ```
 
@@ -89,6 +95,7 @@ kubectl port-forward pod/airflow-webserver-759fccf694-ftk5n 8080:8080 -n airflow
 
 kubectl port-forward pod/mlflo   
 kubectl port-forward pod/logbert-api-f89c5b9ff-kshzr  9000:9000 -n api
+
 
 kubectl port-forward pod/mlflo
 
@@ -174,3 +181,23 @@ helm upgrade --install rca-api code/model-deployment/logbert-chart-api -f code/m
 aws iam get-role --role-name iisc-capstone-rca-model-s3-access --query "Role.AssumeRolePolicyDocument" --output json
 
 aws iam list-roles --query "Roles[?starts_with(RoleName, 'logbert-s3-access')].RoleName" --output text
+
+aws lambda invoke --function-name SendMessageToSQS  output.json
+
+iisc-capstone-rca-airflow-s3-access
+aws s3api get-bucket-notification-configuration --bucket rca.logs.openstack
+
+
+curl -X 'POST' \
+  'http://airflow-webserver.airflow.svc.cluster.local:8080/api/v1/dags/dag_log_rca_orchestrator/dagRuns' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -u admin:Admin \
+  -d '{
+    "conf": {},
+    "dag_run_id": "dag_log_rca_orchestrator",
+    "data_interval_end": "2025-07-03T12:27:26.575Z",
+    "data_interval_start": "2025-07-03T12:27:26.575Z",
+    "logical_date": "2025-07-03T12:27:26.575Z",
+    "note": "string"
+}'
