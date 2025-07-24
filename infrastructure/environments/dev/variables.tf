@@ -93,6 +93,24 @@ variable "install_mlflow" {
   description = "Whether to install MLflow"
 }
 
+variable "install_loki" {
+  type        = bool
+  default     = true
+  description = "Whether to install Grafana Loki for log aggregation"
+}
+
+variable "install_jaeger" {
+  type        = bool
+  default     = true
+  description = "Whether to install Jaeger for distributed tracing"
+}
+
+variable "install_otel_collector" {
+  type        = bool
+  default     = true
+  description = "Whether to install OpenTelemetry Collector"
+}
+
 variable "install_postgres" {
   description = "Whether to install PostgreSQL"
   type        = bool

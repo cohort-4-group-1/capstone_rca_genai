@@ -22,3 +22,11 @@ spec:
           env:
             - name: AWS_REGION
               value: {{ .Values.global.region }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.api.env.OTEL_EXPORTER_OTLP_ENDPOINT | quote }}
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: {{ .Values.api.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT | quote }}
+            - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+              value: {{ .Values.api.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT | quote }}
+            - name: OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
+              value: {{ .Values.api.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT | quote }}
