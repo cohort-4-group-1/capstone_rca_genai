@@ -1,70 +1,64 @@
-# rca_contextual_analysis.py
-
-from langchain_core.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 from langchain_community.llms import HuggingFacePipeline
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-import json
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableSequence
 
+# Updated multi-anomaly prompt template
 RCA_MULTI_PROMPT_TEMPLATE = """
 You are a cloud infrastructure expert skilled in analyzing OpenStack logs and identifying root causes of anomalies.
 
-You are given a list of anomalies, where each anomaly has:
+You are given a list of anomalies. Each anomaly contains:
 - An anomalous log line flagged by a machine learning model.
-- A log sequence (template pattern) preceding the anomaly.
-- A raw log context (actual log lines before and after the anomaly).
+- The raw log context (actual log lines before and after the anomaly).
 
-For each anomaly, analyze the context and respond with a JSON object in this format:
-{{
-  "anomaly_line": "...",
-  "anomaly_cause": "...",
-  "affected_component": "...",
-  "severity": "low | medium | high",
-  "suggested_action": "..."
-}}
+Analyze each anomaly contextually and return a JSON array of RCA results. Each object in the array should contain:
+{
+  "anomaly_line": string,
+  "anomaly_cause": string,
+  "affected_component": string,
+  "severity": "low" | "medium" | "high",
+  "suggested_action": string
+}
 
-Return a JSON array of such objects — one per anomaly. Keep the response concise, technical, and actionable.
+Respond only with a JSON array.
 
----
-
-🔍 Anomalies to analyze:
+Anomalies:
 {anomaly_list}
 """
 
+def create_llm():
+    model_id = "tiiuae/falcon-7b-instruct"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(model_id)
+    hf_pipeline = pipeline(
+        task="text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=512,
+        do_sample=True,
+        temperature=0.7,
+        top_k=50,
+        top_p=0.95,
+        repetition_penalty=1.2
+    )
+    return HuggingFacePipeline(pipeline=hf_pipeline)
 
+llm = create_llm()
 
+# Prompt template using only anomaly_list
+template = PromptTemplate(
+    input_variables=["anomaly_list"],
+    template=RCA_MULTI_PROMPT_TEMPLATE
+)
 
-# Load model once
-model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForCausalLM.from_pretrained(model_id)
-hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer,  max_length=2048,       
-    max_new_tokens=300,      
-    truncation=True,         
-    do_sample=True,
-    temperature=0.7)
+# RunnableSequence is the new style for chaining in LangChain
+chain = template | llm
 
-llm = HuggingFacePipeline(pipeline=hf_pipeline)
-prompt = PromptTemplate.from_template(RCA_MULTI_PROMPT_TEMPLATE)
-chain = prompt | llm
-
-def contextual_analysis_batch(anomaly_inputs: list) -> list:
-    # Format input
-    blocks = []
-    for idx, anomaly in enumerate(anomaly_inputs):
-        block = f"""---
-        Anomaly #{idx+1}
-        🔴 Log Line: {anomaly['anomaly_line']}
-        🧩 Log Sequence: {anomaly['log_sequence']}
-        📜 Raw Context:
-        {anomaly['log_window_text']}
-        """
-        blocks.append(block)
-
-    anomaly_list = "\n".join(blocks)
-    response = chain.invoke({"anomaly_list": anomaly_list})
-
-    try:
-        return json.loads(response)
-    except Exception as e:
-        return [{"error": str(e), "raw_output": response}]
+def contextual_analysis_batch(anomaly_inputs):
+    # Format the anomaly inputs as a string
+    formatted_input = "\n\n".join([
+        f"Anomaly Line: {a['anomaly_line']}\nLog Context:\n{a['log_window_text']}"
+        for a in anomaly_inputs
+    ])
+    response = chain.invoke({"anomaly_list": formatted_input})
+    return response
