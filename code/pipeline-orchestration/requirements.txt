@@ -2,5 +2,3 @@ boto3
 requests
 opentelemetry-api
 opentelemetry-sdk
-opentelemetry-exporter-{exporter}
-opentelemetry-instrumentation-{instrumentation}
