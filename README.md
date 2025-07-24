@@ -1,11 +1,46 @@
 # capstone_rca_genai
 This repository contains the capstone project - RCA with GenAI
 
+## 📋 Table of Contents
+- [Infrastructure Setup](#infrastructure-setup)
+- [Observability Stack](#observability-stack)
+- [Application Services](#application-services)
+- [Development Commands](#development-commands)
+
+## 🏗️ Infrastructure Setup
+
 # Terraform commands
     terraform init
     terraform validate
     terraform plan
     terraform apply -auto-approve
+
+## 📊 Observability Stack
+
+This project includes a comprehensive observability stack for monitoring logs, metrics, and traces:
+
+- **Loki**: Log aggregation and storage
+- **Prometheus**: Metrics collection and storage  
+- **Jaeger**: Distributed tracing
+- **OpenTelemetry Collector**: Unified telemetry hub
+- **Grafana**: Unified dashboard for all observability data
+
+**📖 For detailed setup and usage:** See [`infrastructure/environments/dev/OBSERVABILITY_SETUP.md`](infrastructure/environments/dev/OBSERVABILITY_SETUP.md)
+
+### Quick Access to Observability Services:
+```bash
+# Grafana (unified dashboard)
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+
+# Prometheus (metrics)
+kubectl port-forward -n monitoring svc/prometheus-server 9090:80
+
+# Loki (logs) 
+kubectl port-forward -n monitoring svc/loki-gateway 3100:80
+
+# Jaeger (traces)
+kubectl port-forward -n monitoring svc/jaeger-query 16686:16686
+```
 
 # How to install Managed Apache Airflow
 https://docs.aws.amazon.com/mwaa/latest/userguide/quick-start.html
@@ -45,10 +80,23 @@ docker build -t dask/dask-custom:2023.12.1 .
 docker tag dask/dask-custom:2023.12.1 sujittah/dask-custom:2023.12.1
 docker push sujittah/dask-custom:2023.12.1
 
+
 kubectl port-forward pod/airflow-webserver-75dcbd77db-n7s6d 8080:8080 -n airflow        
 kubectl port-forward pod/mlflow-d8f567dff-zrnf9 5000:5000 -n mlflow   
 kubectl port-forward pod/logbert-api-d58c678d5-8h8xg  9000:9000 -n api
 kubectl port-forward pod/logbert-ui-594f4c5d66-d7xt9  7860:7860 -n api
+
+kubectl port-forward pod/airflow-webserver-759fccf694-ftk5n 8080:8080 -n airflow        
+```
+
+## 🔧 Application Services
+
+### Port Forwarding Commands:
+
+kubectl port-forward pod/mlflo   
+kubectl port-forward pod/logbert-api-f89c5b9ff-kshzr  9000:9000 -n api
+
+
 kubectl port-forward pod/mlflo
 
 

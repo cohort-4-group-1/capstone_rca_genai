@@ -1,1 +1,40 @@
-# Add Prometheus helm values here
+# Prometheus configuration to scrape OpenTelemetry Collector metrics
+server:
+  extraScrapeConfigs: |
+    # OpenTelemetry Collector metrics (where custom DAG metrics are exposed)
+    - job_name: 'opentelemetry-collector'
+      static_configs:
+        - targets: ['opentelemetry-collector.monitoring.svc.cluster.local:8889']
+      scrape_interval: 15s
+      metrics_path: /metrics
+      scheme: http
+      
+    # Airflow built-in metrics (from webserver and scheduler)
+    - job_name: 'airflow-webserver'
+      static_configs:
+        - targets: ['airflow-webserver.airflow.svc.cluster.local:8080']
+      scrape_interval: 30s
+      metrics_path: /admin/metrics
+      scheme: http
+      
+    - job_name: 'airflow-scheduler'
+      static_configs:
+        - targets: ['airflow-scheduler.airflow.svc.cluster.local:8080']
+      scrape_interval: 30s
+      metrics_path: /admin/metrics
+      scheme: http
+
+# Enable persistent storage for metrics data
+persistentVolume:
+  enabled: true
+  size: 8Gi
+  storageClass: gp3
+
+# Resource limits to prevent OOM issues
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

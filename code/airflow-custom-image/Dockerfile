@@ -33,4 +33,10 @@ RUN pip install --no-cache-dir \
     keras==2.13.1 \
     transformers==4.31.0 \
     huggingface_hub \
+    opentelemetry-api \
+    opentelemetry-sdk \
+    opentelemetry-exporter-otlp-proto-http \
+    opentelemetry-instrumentation-requests \
+    opentelemetry-instrumentation-boto3sqs \
+    opentelemetry-instrumentation-logging
    

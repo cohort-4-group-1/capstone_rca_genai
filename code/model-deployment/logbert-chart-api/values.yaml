@@ -6,9 +6,11 @@ global:
     roleArn: arn:aws:iam::141134438799:role/iisc-capstone-rca-model-s3-access
 
 api:
-  image:
-    repository: sujittah/logbert-api
-    tag: latest
   service:
     port: 9000
+  env:
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces"
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/logs"
 
