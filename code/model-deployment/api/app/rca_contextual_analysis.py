@@ -43,43 +43,53 @@ Respond in this JSON format:
 ---
 """
 
-# Load model once
+# Load model
 model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+print("Starting to create tokenizer")
 tokenizer = AutoTokenizer.from_pretrained(model_id)
+print("Starting to create model")
 model = AutoModelForCausalLM.from_pretrained(model_id)
-hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
-
+print("Starting to create hf_pipeline")
+hf_pipeline = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=512,  # limit output length
+)
+print("Starting to create llm")
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
+print("Starting to create prompt")
 prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
+print("Starting to create chain")
 chain = prompt | llm
 
 MAX_TOKENS = 2048
 
-def truncate_input_to_token_limit(prompt_template: str, anomaly_line: str, log_sequence: str, log_window_text: str, tokenizer, max_tokens: int = 2048):
-    formatted_prompt = prompt_template.format(
-        anomaly_line=anomaly_line,
-        log_sequence=log_sequence,
-        log_window_text=log_window_text
-    )
-    tokens = tokenizer.tokenize(formatted_prompt)
-    if len(tokens) <= max_tokens:
-        return anomaly_line, log_sequence, log_window_text
 
-    trimmed_log_window = log_window_text
-    while len(tokenizer.tokenize(prompt_template.format(
-        anomaly_line=anomaly_line,
-        log_sequence=log_sequence,
-        log_window_text=trimmed_log_window
-    ))) > max_tokens:
-        trimmed_log_window = trimmed_log_window[len(trimmed_log_window)//10:]
-        if len(trimmed_log_window) < 100:
+def truncate_input_to_token_limit(prompt_obj, anomaly_line, log_sequence, log_window_text, tokenizer, max_tokens=2048):
+    while True:
+        formatted_prompt = prompt_obj.format_prompt(
+            anomaly_line=anomaly_line,
+            log_sequence=log_sequence,
+            log_window_text=log_window_text
+        ).to_string()
+        token_count = len(tokenizer.tokenize(formatted_prompt))
+        if token_count <= max_tokens:
+            return anomaly_line, log_sequence, log_window_text
+        # Truncate log_window_text iteratively
+        log_window_text = log_window_text[len(log_window_text) // 10:]
+        if len(log_window_text) < 100:
             break
+    return anomaly_line, log_sequence, log_window_text
 
-    return anomaly_line, log_sequence, trimmed_log_window
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
+    print("**************** Before truncate *************************")
+    print(f"anomaly_line: {anomaly_line}")
+    print(f"log_sequence: {log_sequence}")
+    print(f"log_window_text: {log_window_text}")
     anomaly_line, log_sequence, log_window_text = truncate_input_to_token_limit(
-        RCA_PROMPT_TEMPLATE,
+        prompt,
         anomaly_line,
         log_sequence,
         log_window_text,
@@ -91,8 +101,14 @@ def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: s
         "log_sequence": log_sequence,
         "log_window_text": log_window_text
     }
+    print("**************** After truncate *************************")
+    print(f"anomaly_line: {anomaly_line}")
+    print(f"log_sequence: {log_sequence}")
+    print(f"log_window_text: {log_window_text}")
     response = chain.invoke(input_vars)
+    print("Json will be loaded")
     try:
-        return json.loads(response)
+        return json.loads(response)    
     except Exception as e:
+        print(f"Exception occured: {str(e)}")
         return {"raw_output": response, "error": str(e)}
