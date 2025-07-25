@@ -8,7 +8,8 @@ RCA_PROMPT_TEMPLATE = """
 You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies. You are given:
 
 1. An anomalous log line that was flagged by a machine learning model.
-3. A raw log wisequencendow — actual log lines before and after the anomaly.
+2. A log sequence — a list of log templates leading up to the anomaly.
+3. A raw log window — actual log lines before and after the anomaly.
 
 Your job is to:
 - Identify possible causes of the anomaly.
@@ -19,6 +20,9 @@ Your job is to:
 
 Suspicious Log Line:
 "{anomaly_line}"
+
+Log Sequence (Template Pattern):
+"{log_sequence}"
 
 Raw Log Context:
 {log_window_text}
@@ -55,6 +59,7 @@ def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: s
         log_window_text = log_window_text[-MAX_LOG_WINDOW_CHARS:]
     input_vars = {
         "anomaly_line": anomaly_line,
+        "log_sequence": log_sequence,
         "log_window_text": log_window_text
     }
     response = chain.invoke(input_vars)

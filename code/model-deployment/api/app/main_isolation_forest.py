@@ -137,6 +137,7 @@ def analyze_log(file: UploadFile = File(...)):
         first_anomaly_found = False
         results = []
         for i, seq in enumerate(sequences):
+           if not first_anomaly_found:
             anomaly_score = float(scores[i])
             is_anomaly = bool(preds[i] == 1)
 
@@ -159,7 +160,7 @@ def analyze_log(file: UploadFile = File(...)):
                 first_anomaly_found = True
             
             results.append(result)    
-        
+    
         return results
 
 
