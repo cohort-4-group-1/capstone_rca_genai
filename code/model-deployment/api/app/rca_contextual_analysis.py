@@ -54,9 +54,15 @@ chain = prompt | llm
 MAX_TOKENS = 2048
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
-    MAX_LOG_WINDOW_CHARS = 2000
-    if len(log_window_text) > MAX_LOG_WINDOW_CHARS:
-        log_window_text = log_window_text[-MAX_LOG_WINDOW_CHARS:]
+    max_total_chars = 6000  # 2048 tokens * ~3 chars per token
+    print (f"Length of anomaly_line: {len(anomaly_line)}")
+    print (f"Length of log_sequence  : {len(log_sequence)}")
+    print (f"Length of log_window_text : {len(log_window_text)}")
+    # Ensure log_window_text truncation first (as it's largest)
+    remaining_chars = max_total_chars - len(anomaly_line) - len(log_sequence)
+    if len(log_window_text) > remaining_chars:
+        log_window_text = log_window_text[-remaining_chars:]
+
     input_vars = {
         "anomaly_line": anomaly_line,
         "log_sequence": log_sequence,
