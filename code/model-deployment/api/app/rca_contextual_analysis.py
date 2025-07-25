@@ -45,7 +45,7 @@ Respond in this JSON format:
 model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id)
-hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
+hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer,max_new_tokens=512)
 
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
 prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
@@ -55,14 +55,21 @@ MAX_TOKENS = 2048
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     max_total_chars = 6000  # 2048 tokens * ~3 chars per token
-    print (f"Length of anomaly_line: {len(anomaly_line)}")
-    print (f"Length of log_sequence  : {len(log_sequence)}")
-    print (f"Length of log_window_text : {len(log_window_text)}")
-    # Ensure log_window_text truncation first (as it's largest)
-    remaining_chars = max_total_chars - len(anomaly_line) - len(log_sequence)
-    if len(log_window_text) > remaining_chars:
-        log_window_text = log_window_text[-remaining_chars:]
+    print (f"Before truncate -  Length of anomaly_line: {len(anomaly_line)}")
+    print (f"Before truncate -  Length of log_sequence  : {len(log_sequence)}")
+    print (f"Before truncate -  ength of log_window_text : {len(log_window_text)}")
+     # Allocate budget (you can tweak this ratio)
+    max_log_sequence_chars = int(max_total_chars * 0.4)
+    max_log_window_chars = max_total_chars - len(anomaly_line) - max_log_sequence_chars
 
+    if len(log_sequence) > max_log_sequence_chars:
+        log_sequence = log_sequence[-max_log_sequence_chars:]
+    if len(log_window_text) > max_log_window_chars:
+        log_window_text = log_window_text[-max_log_window_chars:]
+
+    print (f"After truncate -  Length of anomaly_line: {len(anomaly_line)}")
+    print (f"After truncate -  Length of log_sequence  : {len(log_sequence)}")
+    print (f"After truncate -  ength of log_window_text : {len(log_window_text)}")
     input_vars = {
         "anomaly_line": anomaly_line,
         "log_sequence": log_sequence,
