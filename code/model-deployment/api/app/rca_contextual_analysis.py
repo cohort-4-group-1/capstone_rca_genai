@@ -62,7 +62,7 @@ print("Starting to create prompt")
 prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 print("Starting to create chain")
 chain = prompt | llm
-
+print("chain is done")
 MAX_TOKENS = 2048
 
 
@@ -85,9 +85,9 @@ def truncate_input_to_token_limit(prompt_obj, anomaly_line, log_sequence, log_wi
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     print("**************** Before truncate *************************")
-    print(f"anomaly_line: {anomaly_line}")
-    print(f"log_sequence: {log_sequence}")
-    print(f"log_window_text: {log_window_text}")
+    print(f"anomaly_line: {len(anomaly_line)}")
+    print(f"log_sequence: {len(log_sequence)}")
+    print(f"log_window_text: {len(log_window_text)}")
     anomaly_line, log_sequence, log_window_text = truncate_input_to_token_limit(
         prompt,
         anomaly_line,
@@ -102,9 +102,9 @@ def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: s
         "log_window_text": log_window_text
     }
     print("**************** After truncate *************************")
-    print(f"anomaly_line: {anomaly_line}")
-    print(f"log_sequence: {log_sequence}")
-    print(f"log_window_text: {log_window_text}")
+    print(f"anomaly_line: {len(anomaly_line)}")
+    print(f"log_sequence: {len(log_sequence)}")
+    print(f"log_window_text: {len(log_window_text)}")
     response = chain.invoke(input_vars)
     print("Json will be loaded")
     try:

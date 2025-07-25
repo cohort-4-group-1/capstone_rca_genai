@@ -56,6 +56,11 @@ else:
     api_request_duration = None
     api_errors_total = None
 
+
+api_requests_total = None
+api_request_duration = None
+api_errors_total = None
+
 # --- Startup event: Load model and template miner ---
 @app.on_event("startup")
 def load_resources():
