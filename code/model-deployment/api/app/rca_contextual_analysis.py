@@ -48,12 +48,14 @@ chain = prompt | llm
 MAX_TOKENS = 2048
 
 def contextual_analysis_batch(anomaly_inputs):
+    print(f"contextual_analysis_batch started")
+
     prompt_header = RCA_PROMPT_TEMPLATE.split("{anomaly_list}")[0].strip()
     base_tokens = len(tokenizer.encode(prompt_header))
-
+    
     formatted_blocks = []
     total_tokens = base_tokens
-
+    print(f"base_tokens: {base_tokens}")
     for anomaly in anomaly_inputs:
         block = (
             f"Anomaly Line:\n{anomaly['anomaly_line']}\n"

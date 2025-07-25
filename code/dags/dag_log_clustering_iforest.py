@@ -84,7 +84,7 @@ def train_isolation_forest():
                 "anomaly_ratio": anomaly_ratio,
                 "n_anomalies": anomaly_count,
                 "n_normals": normal_count
-        })
+            })
 
         return avg_score
 
@@ -102,7 +102,33 @@ def train_isolation_forest():
         n_jobs=N_JOBS
     )
     iforest.fit(X)
+    with mlflow.start_run():
+        # Evaluate best model again for logging final metrics to main run
+        scores = -iforest.decision_function(X)
+        avg_score = float(np.mean(scores))
+        std_score = float(np.std(scores))
+        iqr_score = float(np.percentile(scores, 75) - np.percentile(scores, 25))
 
+        preds = iforest.predict(X)
+        anomaly_count = int((preds == -1).sum())
+        normal_count = int((preds == 1).sum())
+        anomaly_ratio = anomaly_count / len(preds)
+
+        kmeans_labels = KMeans(n_clusters=5, random_state=42).fit_predict(X)
+        sil_score = silhouette_score(X, kmeans_labels)
+        _, counts = np.unique(kmeans_labels, return_counts=True)
+
+        mlflow.log_metrics({
+            "final_avg_anomaly_score": avg_score,
+            "final_std_anomaly_score": std_score,
+            "final_iqr_anomaly_score": iqr_score,
+            "final_anomaly_ratio": anomaly_ratio,
+            "final_n_anomalies": anomaly_count,
+            "final_n_normals": normal_count,
+            "final_silhouette_score": sil_score
+        })
+        for i, count in enumerate(counts):
+            mlflow.log_metric(f"final_cluster_{i}_count", count)
     joblib.dump((vectorizer, iforest), LOCAL_MODEL_PATH)
     print(f"started to upload the model in s3")
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")

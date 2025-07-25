@@ -135,39 +135,32 @@ def analyze_log(file: UploadFile = File(...)):
         scores = iforest.decision_function(X)   # Higher = more anomalous
 
         anomalies = []
-        for i, seq in enumerate(sequences):
-            if preds[i] == -1:
-                window_start = max(i, 0)
-                window_end = min(i + 10, len(lines))
-                context_window = lines[window_start:window_end]
-                anomaly_line = lines[i]
-                log_sequence = " ".join(templates[i:i + 5])
-                log_window_text = "\n".join(context_window)
-
-                anomalies.append({
-                    "anomaly_line": anomaly_line,
-                    "log_sequence": log_sequence,
-                    "log_window_text": log_window_text
-                })
-
-        rca_results = contextual_analysis_batch(anomalies)
-        # Combine RCA results with input info
+        first_anomaly_found = False
         results = []
-        if isinstance(rca_results, list):
-            for i in range(len(anomalies)):
-                results.append({
-                    "anomaly_line": anomalies[i]["anomaly_line"],
-                    "rca": rca_results[i] if i < len(rca_results) else {"error": "No RCA result"}
-                })
-        else:
-            # RCA failed entirely (e.g., JSON decoding failed)
-            for anomaly in anomalies:
-                results.append({
-                    "anomaly_line": anomaly["anomaly_line"],
-                    "rca": rca_results  # This will include the raw_output and error message
-                })
+        for i, seq in enumerate(sequences):
+            anomaly_score = float(scores[i])
+            is_anomaly = bool(preds[i] == 1)
 
+            result = {
+                "window_start_line": lines[i],
+                "anomaly_score": anomaly_score,
+                "pred" : preds[i],    
+                "is_anomaly": is_anomaly
+            }
+            window_start = max(i, 0)
+            window_end = min(i + 20, len(lines))
+            context_window = lines[window_start:window_end]
 
+            if is_anomaly and not first_anomaly_found:
+                rca_result = analyze_context_with_llm(
+                    anomaly_line=lines[i],
+                    context_lines=context_window
+                )
+                result["rca"] = rca_result
+                first_anomaly_found = True
+            
+            results.append(result)    
+        
         return results
 
 
@@ -179,6 +172,8 @@ def analyze_log(file: UploadFile = File(...)):
 # --- API: Upload log and get anomaly prediction ---
 @app.post("/analyze-log-anamaly")
 def analyze_log_anamaly(file: UploadFile = File(...)):
+    import time
+    start_time = time.time()
     if not MODEL:
         raise HTTPException(status_code=500, detail="Isolation Forest model not loaded")
 
