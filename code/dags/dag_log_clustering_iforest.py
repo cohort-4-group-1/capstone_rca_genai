@@ -117,7 +117,6 @@ def train_isolation_forest():
         kmeans_labels = KMeans(n_clusters=5, random_state=42).fit_predict(X)
         sil_score = silhouette_score(X, kmeans_labels)
         _, counts = np.unique(kmeans_labels, return_counts=True)
-        entropy = -np.sum((counts / len(X)) * np.log2(counts / len(X)))
 
         mlflow.log_metrics({
             "final_avg_anomaly_score": avg_score,
@@ -126,8 +125,7 @@ def train_isolation_forest():
             "final_anomaly_ratio": anomaly_ratio,
             "final_n_anomalies": anomaly_count,
             "final_n_normals": normal_count,
-            "final_silhouette_score": sil_score,
-            "final_cluster_entropy": entropy
+            "final_silhouette_score": sil_score
         })
         for i, count in enumerate(counts):
             mlflow.log_metric(f"final_cluster_{i}_count", count)
