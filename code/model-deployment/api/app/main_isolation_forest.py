@@ -24,7 +24,6 @@ from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from transformers import AutoTokenizer
 
 
 # FastAPI app
@@ -102,15 +101,6 @@ def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dic
     logger.info(f"Analyzing context for anomaly line: {anomaly_line}")
     return contextual_analysis(anomaly_line, log_sequence, log_window_text)
 
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-
-def split_prompt_chunks(prompt: str, max_tokens: int = 2000):
-    tokens = tokenizer.encode(prompt)
-    chunks = []
-    for i in range(0, len(tokens), max_tokens):
-        chunk = tokens[i:i + max_tokens]
-        chunks.append(tokenizer.decode(chunk))
-    return chunks
 
 # --- API: Upload log and get anomaly prediction ---
 @app.post("/analyze-log")
