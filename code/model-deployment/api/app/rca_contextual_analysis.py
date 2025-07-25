@@ -63,13 +63,15 @@ def contextual_analysis_batch(anomaly_inputs):
         block_tokens = len(tokenizer.encode(block))
 
         if total_tokens + block_tokens > MAX_TOKENS:
-            print(f"Total toke: {total_tokens + block_tokens}")
+            print(f"Total token: {total_tokens + block_tokens}")
             break
 
         formatted_blocks.append(block)
         total_tokens += block_tokens
 
     formatted_input = "\n\n".join(formatted_blocks)
+    formatted_input_token=len(tokenizer.encode(formatted_input))
+    print(f"formatted_input_tokens: {formatted_input_token}")
 
     response = chain.invoke({"anomaly_list": formatted_input})
 

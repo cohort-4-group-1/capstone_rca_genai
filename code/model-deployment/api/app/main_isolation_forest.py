@@ -125,7 +125,7 @@ def analyze_log(file: UploadFile = File(...)):
         templates = parse_templates(lines)
 
         # Step 3: Group templates into sequences
-        sequences = group_sequences(templates, window_size=10)
+        sequences = group_sequences(templates, window_size=5)
         if not sequences:
             raise HTTPException(status_code=400, detail="Not enough lines to form sequences")
 
@@ -138,10 +138,10 @@ def analyze_log(file: UploadFile = File(...)):
         for i, seq in enumerate(sequences):
             if preds[i] == -1:
                 window_start = max(i, 0)
-                window_end = min(i + 20, len(lines))
+                window_end = min(i + 10, len(lines))
                 context_window = lines[window_start:window_end]
                 anomaly_line = lines[i]
-                log_sequence = " ".join(templates[i:i + 10])
+                log_sequence = " ".join(templates[i:i + 5])
                 log_window_text = "\n".join(context_window)
 
                 anomalies.append({
