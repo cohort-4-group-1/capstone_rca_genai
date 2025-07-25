@@ -29,8 +29,6 @@ For each anomaly, respond in this JSON list format:
   {{
     "anomaly_line": "...",
     "anomaly_cause": "...",
-    "affected_component": "...",
-    "severity": "low | medium | high",
     "suggested_action": "..."
   }},
   ...
@@ -58,13 +56,14 @@ def contextual_analysis_batch(anomaly_inputs):
 
     for anomaly in anomaly_inputs:
         block = (
-            f"🔴 Anomaly Line:\n{anomaly['anomaly_line']}\n"
-            f"🧩 Log Sequence:\n{anomaly.get('log_sequence', '')}\n"
-            f"📜 Log Window:\n{anomaly['log_window_text']}"
+            f"Anomaly Line:\n{anomaly['anomaly_line']}\n"
+            f"Log Sequence:\n{anomaly.get('log_sequence', '')}\n"
+            f"Log Window:\n{anomaly['log_window_text']}"
         )
         block_tokens = len(tokenizer.encode(block))
 
         if total_tokens + block_tokens > MAX_TOKENS:
+            print(f"Total toke: {total_tokens + block_tokens}")
             break
 
         formatted_blocks.append(block)
