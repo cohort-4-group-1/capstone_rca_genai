@@ -75,7 +75,7 @@ def train_isolation_forest():
                 "contamination": contamination,
                 "max_samples": max_samples
             })
-           mlflow.log_metrics({
+            mlflow.log_metrics({
                 "avg_anomaly_score": avg_score,
                 "std_anomaly_score": std_score,
                 "iqr_anomaly_score": iqr_score,
