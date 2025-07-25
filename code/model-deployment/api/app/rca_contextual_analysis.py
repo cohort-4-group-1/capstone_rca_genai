@@ -33,8 +33,6 @@ Please explain the likely root cause or contributing factors, even if speculativ
 Respond in this JSON format:
 
 {{
-For each anomaly, analyze the context and respond with a JSON object in this format:
-{
   "anomaly_line": "...",
   "anomaly_cause": "...",
   "affected_component": "...",
@@ -43,38 +41,6 @@ For each anomaly, analyze the context and respond with a JSON object in this for
 }}
 
 ---
-
-"""
-
-RCA_BATCH_PROMPT_TEMPLATE = """
-You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies.
-
-You are given a list of anomalies, where each anomaly includes:
-- A suspicious log line.
-- A log sequence of templates before the anomaly.
-- Raw log context around the anomaly.
-
-Your job is to:
-- Identify possible causes for each anomaly.
-- Suggest where the issue might have originated.
-- Keep the answers concise, technical, and actionable.
-
----
-
-{anomaly_list}
-
----
-
-For each anomaly, respond in this JSON list format:
-
-[
-  {{
-    "anomaly_line": "...",
-    "anomaly_cause": "...",
-    "suggested_action": "..."
-  }},
-  ...
-]
 """
 
 # Load model once
@@ -88,42 +54,6 @@ prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 chain = prompt | llm
 
 MAX_TOKENS = 2048
-
-def contextual_analysis_batch(anomaly_inputs):
-    print(f"contextual_analysis_batch started")
-
-    prompt_header = RCA_PROMPT_TEMPLATE.split("{anomaly_list}")[0].strip()
-    base_tokens = len(tokenizer.encode(prompt_header))
-
-    formatted_blocks = []
-    total_tokens = base_tokens
-    print(f"base_tokens: {base_tokens}")
-    for anomaly in anomaly_inputs:
-        block = (
-            f"Anomaly Line:\n{anomaly['anomaly_line']}\n"
-            f"Log Sequence:\n{anomaly.get('log_sequence', '')}\n"
-            f"Log Window:\n{anomaly['log_window_text']}"
-        )
-        block_tokens = len(tokenizer.encode(block))
-
-        if total_tokens + block_tokens > MAX_TOKENS:
-            print(f"Total token: {total_tokens + block_tokens}")
-            break
-
-        formatted_blocks.append(block)
-        total_tokens += block_tokens
-
-    formatted_input = "\n\n".join(formatted_blocks)
-    formatted_input_token=len(tokenizer.encode(formatted_input))
-    print(f"formatted_input_tokens: {formatted_input_token}")
-
-    response = chain.invoke({"anomaly_list": formatted_input})
-
-    try:
-        return json.loads(response)
-    except Exception as e:
-        return {"raw_output": response, "error": str(e)}
-
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     MAX_LOG_WINDOW_CHARS = 2000
