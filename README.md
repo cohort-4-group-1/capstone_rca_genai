@@ -82,7 +82,7 @@ docker push sujittah/dask-custom:2023.12.1
 
 kubectl port-forward pod/airflow-webserver-75dcbd77db-n7s6d 8080:8080 -n airflow        
 kubectl port-forward pod/mlflow-d8f567dff-zrnf9 5000:5000 -n mlflow   
-kubectl port-forward pod/logbert-api-567986c8cb-45gz6  9000:9000 -n api
+kubectl port-forward pod/logbert-api-65cc455f5-6xl98  9000:9000 -n api
 kubectl port-forward pod/logbert-ui-594f4c5d66-d7xt9  7860:7860 -n api
 
 kubectl port-forward pod/airflow-webserver-759fccf694-ftk5n 8080:8080 -n airflow        
