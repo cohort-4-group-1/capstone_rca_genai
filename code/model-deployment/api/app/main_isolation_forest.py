@@ -114,6 +114,9 @@ def analyze_log(file: UploadFile = File(...)):
         if api_errors_total:
             api_errors_total.add(1, {"endpoint": "/analyze-log", "error": "model_not_loaded"})
         raise HTTPException(status_code=500, detail="Model not loaded")
+    
+    vectorizer, iforest = MODEL
+    
     try:
         # Step 1: Read raw log lines
         lines = [line.decode("utf-8").strip() for line in file.file.readlines() if line.strip()]
