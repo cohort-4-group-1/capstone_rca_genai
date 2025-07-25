@@ -7,7 +7,6 @@ from typing import List
 import configuration
 
 import requests  # Required for invoking LLM-based context analysis
-from rca_contextual_analysis import contextual_analysis_batch 
 import traceback
 
 
