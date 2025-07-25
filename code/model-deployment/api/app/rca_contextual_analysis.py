@@ -47,9 +47,9 @@ For each anomaly, analyze the context and respond with a JSON object in this for
 """
 
 # Load model once
-model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto")
+model = AutoModelForCausalLM.from_pretrained(model_id)
 hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
