@@ -7,40 +7,38 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import json
 
 RCA_PROMPT_TEMPLATE = """
-You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies. You are given:
+You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies.
 
-1. An anomalous log line that was flagged by a machine learning model.
-2. A log sequence — a list of log templates leading up to the anomaly.
-3. A raw log window — actual log lines before and after the anomaly.
+You are given a list of anomalies, where each anomaly includes:
+- A suspicious log line.
+- A log sequence of templates before the anomaly.
+- Raw log context around the anomaly.
 
 Your job is to:
-- Identify possible causes of the anomaly.
+- Identify possible causes for each anomaly.
 - Suggest where the issue might have originated.
-- Keep it concise, technical, and actionable.
+- Keep the answers concise, technical, and actionable.
 
 ---
 
-🔴 Suspicious Log Line:
-"{anomaly_line}"
-
-🧩 Log Sequence (Template Pattern):
-"{log_sequence}"
-
-📜 Raw Log Context:
-{log_window_text}
+{anomaly_list}
 
 ---
 
-Please explain the likely root cause or contributing factors, even if speculative.
-Respond in this JSON format:
+For each anomaly, respond in this JSON list format:
 
-{{
-  "anomaly_cause": "...",
-  "affected_component": "...",
-  "severity": "low | medium | high",
-  "suggested_action": "..."
-}}
+[
+  {{
+    "anomaly_line": "...",
+    "anomaly_cause": "...",
+    "affected_component": "...",
+    "severity": "low | medium | high",
+    "suggested_action": "..."
+  }},
+  ...
+]
 """
+
 
 
 # Load model once
@@ -54,13 +52,21 @@ prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 chain = prompt | llm
 
 def contextual_analysis_batch(anomaly_inputs):
-    # Format the anomaly inputs as a string
+    # Construct a formatted block of anomalies
     formatted_input = "\n\n".join([
-        f"Anomaly Line: {a['anomaly_line']}\nLog Context:\n{a['log_window_text']}"
+        f"🔴 Anomaly Line:\n{a['anomaly_line']}\n"
+        f"🧩 Log Sequence:\n{a.get('log_sequence', '')}\n"
+        f"📜 Log Window:\n{a['log_window_text']}"
         for a in anomaly_inputs
     ])
+
     response = chain.invoke({"anomaly_list": formatted_input})
-    return response
+
+    try:
+        return json.loads(response)
+    except Exception as e:
+        return {"raw_output": response, "error": str(e)}
+
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     MAX_LOG_WINDOW_CHARS = 2000
