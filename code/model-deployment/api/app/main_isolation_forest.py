@@ -95,7 +95,7 @@ def group_sequences(templates: List[str], window_size=10) -> List[str]:
 # --- Utility: Call LLM-based contextual analyzer ---
 def analyze_context_with_llm(anomaly_line: str, context_lines: List[str]) -> dict:
     log_template = " ".join(parse_templates(context_lines))
-    log_sequence = group_sequences(log_template, window_size=10)
+    log_sequence = group_sequences(log_template, window_size=5)
     log_window_text = "\n".join(context_lines)
     logger.info(f"Analyzing context for anomaly line: {anomaly_line}")
     return contextual_analysis(anomaly_line, log_sequence, log_window_text)
@@ -147,7 +147,7 @@ def analyze_log(file: UploadFile = File(...)):
                 "is_anomaly": is_anomaly
             }
             window_start = max(i, 0)
-            window_end = min(i + 20, len(lines))
+            window_end = min(i + 5, len(lines))
             context_window = lines[window_start:window_end]
 
             if is_anomaly and not first_anomaly_found:
