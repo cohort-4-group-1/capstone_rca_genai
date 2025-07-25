@@ -25,8 +25,7 @@ eksctl create cluster --name airflow --region us-east-1 --version 1.32   --nodeg
 
 eksctl delete cluster --name airflow-eks --region us-east-1
 
-aws eks --  us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
-
+aws eks --region us-east-1 update-kubeconfig --name iisc-capstone-rca-eks                                                  
 helm install airflow bitnami/airflow --namespace  airflow -f ./values.yaml
 
 
@@ -47,7 +46,7 @@ docker push sujittah/dask-custom:2023.12.1
 
 kubectl port-forward pod/airflow-webserver-75dcbd77db-n7s6d 8080:8080 -n airflow        
 kubectl port-forward pod/mlflow-d8f567dff-zrnf9 5000:5000 -n mlflow   
-kubectl port-forward pod/logbert-api-d58c678d5-8h8xg  9000:9000 -n api
+kubectl port-forward pod/logbert-api-567986c8cb-45gz6  9000:9000 -n api
 kubectl port-forward pod/logbert-ui-594f4c5d66-d7xt9  7860:7860 -n api
 kubectl port-forward pod/mlflo
 
@@ -110,7 +109,7 @@ To delete all the volumes
 aws ec2 delete-volume --volume-id 
 vol-059159e86323fde4c                                                                        
 
-uvicorn main_encoder:app --host 0.0.0.0 --port 9000 --reload
+uvicorn main_isolation_forest:app --host 0.0.0.0 --port 9000 --reload
 
 aws eks --region us-east-1 update-kubeconfig --name iisc-capstone-rca-eks
 kubetctl get pods -n airflow
