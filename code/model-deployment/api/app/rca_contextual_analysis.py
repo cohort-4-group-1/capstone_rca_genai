@@ -53,6 +53,15 @@ llm = HuggingFacePipeline(pipeline=hf_pipeline)
 prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 chain = prompt | llm
 
+def contextual_analysis_batch(anomaly_inputs):
+    # Format the anomaly inputs as a string
+    formatted_input = "\n\n".join([
+        f"Anomaly Line: {a['anomaly_line']}\nLog Context:\n{a['log_window_text']}"
+        for a in anomaly_inputs
+    ])
+    response = chain.invoke({"anomaly_list": formatted_input})
+    return response
+
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     MAX_LOG_WINDOW_CHARS = 2000
     if len(log_window_text) > MAX_LOG_WINDOW_CHARS:
