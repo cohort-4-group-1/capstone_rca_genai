@@ -5,6 +5,7 @@ This directory contains Terraform configuration for deploying the MLOps platform
 ## 📋 Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Observability Stack](#observability-stack)
 - [Prerequisites](#prerequisites)
 - [Resource Provisioning (terraform apply)](#resource-provisioning-terraform-apply)
 - [Resource Destruction (terraform destroy)](#resource-destruction-terraform-destroy)
@@ -30,6 +31,22 @@ The infrastructure deploys the following components:
 - **Dask**: Distributed computing framework
 - **MLflow**: ML lifecycle management
 - **ClearML**: ML experiment tracking (optional)
+
+## 📊 Observability Stack
+
+This infrastructure includes a comprehensive observability stack for monitoring your MLOps pipeline:
+
+- **📋 Logs**: Collected via OpenTelemetry → stored in Loki → visualized in Grafana
+- **📈 Metrics**: Collected via OpenTelemetry → stored in Prometheus → visualized in Grafana  
+- **🔍 Traces**: Collected via OpenTelemetry → stored in Jaeger → visualized in Grafana
+
+**📖 Complete Setup Guide:** [`OBSERVABILITY_SETUP.md`](./OBSERVABILITY_SETUP.md)
+
+**🎯 Quick Access:**
+```bash
+# Unified observability dashboard
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+```
 
 ## 🚀 Prerequisites
 

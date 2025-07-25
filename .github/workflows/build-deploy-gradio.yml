@@ -60,7 +60,6 @@ jobs:
     - name: Install dependencies for the Gradio UI
       run: |
         python -m pip install --upgrade pip
-        pip install -r code/model-deployment/gradio/requirements.txt
         pip install awscli
 
       
@@ -84,7 +83,7 @@ jobs:
         # Build a docker container and
         # push it to ECR so that it can
         # be deployed to ECS.
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f code/model-deployment/gradio/Dockerfile.gradio code/model-deployment/gradio
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -f code/model-deployment/gradio/Dockerfile.gradio code/model-deployment/gradio
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
@@ -105,4 +104,4 @@ jobs:
     - name: Deploy to Kubernetes using Helm
       run: |
         kubectl create namespace api --dry-run -o yaml | kubectl apply -f -
-        helm upgrade --install rca-api code/model-deployment/logbert-chart-ui -f code/model-deployment/logbert-chart-ui/values.yaml --set api.image=${{ steps.build-image.outputs.image }} --namespace api
+        helm upgrade --install rca-ui code/model-deployment/logbert-chart-ui -f code/model-deployment/logbert-chart-ui/values.yaml --set ui.image=${{ steps.build-image.outputs.image }} --namespace api

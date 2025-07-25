@@ -539,6 +539,13 @@ resource "kubernetes_namespace" "dask" {
   }
 }
 
+# Create API namespace for model deployment
+resource "kubernetes_namespace" "api" {
+  metadata {
+    name = "api"
+  }
+}
+
 # Kubernetes ServiceAccount with annotation
 resource "kubernetes_service_account" "dask_access" {
   metadata {
@@ -751,6 +758,128 @@ module "mlflow" {
   values_files   = ["${path.module}/values/mlflow-values.yaml"]
 }
 
+
+# Loki for log aggregation
+module "loki" {
+  source       = "./modules/helm_release"
+  count        = var.install_loki ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "loki"
+  namespace    = "monitoring"
+  chart        = "loki"
+  repo         = "https://grafana.github.io/helm-charts"
+  values_files = ["${path.module}/values/loki-values.yaml"]
+  chart_version = "6.6.4"
+}
+
+# Jaeger for distributed tracing
+module "jaeger" {
+  source       = "./modules/helm_release"
+  count        = var.install_jaeger ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness
+  depends_on   = [null_resource.wait_for_cluster]
+
+  enabled      = true
+  name         = "jaeger"
+  namespace    = "monitoring"
+  chart        = "jaeger"
+  repo         = "https://jaegertracing.github.io/helm-charts"
+  values_files = ["${path.module}/values/jaeger-values.yaml"]
+  chart_version = "3.0.10"
+}
+
+# OpenTelemetry Collector for metrics and traces
+module "otel_collector" {
+  source       = "./modules/helm_release"
+  count        = var.install_otel_collector ? 1 : 0
+  
+  # Add explicit dependency on cluster readiness and Jaeger
+  depends_on   = [null_resource.wait_for_cluster, module.jaeger]
+
+  enabled      = true
+  name         = "opentelemetry-collector"
+  namespace    = "monitoring"
+  chart        = "opentelemetry-collector"
+  repo         = "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  values_files = ["${path.module}/values/otel-collector-values.yaml"]
+  chart_version = "0.97.1"
+}
+
+# Service for OpenTelemetry Collector DaemonSet
+# The OpenTelemetry Collector Helm chart in DaemonSet mode doesn't create a service by default
+# This service is needed for Airflow to connect to the collector via http://opentelemetry-collector:4318
+resource "kubernetes_service" "opentelemetry_collector" {
+  count      = var.install_otel_collector ? 1 : 0
+  depends_on = [module.otel_collector]
+
+  metadata {
+    name      = "opentelemetry-collector"
+    namespace = "monitoring"
+    labels = {
+      "app.kubernetes.io/name"     = "opentelemetry-collector"
+      "app.kubernetes.io/instance" = "opentelemetry-collector"
+    }
+  }
+
+  spec {
+    type = "ClusterIP"
+
+    port {
+      name        = "otlp-grpc"
+      port        = 4317
+      target_port = 4317
+      protocol    = "TCP"
+    }
+
+    port {
+      name        = "otlp-http"
+      port        = 4318
+      target_port = 4318
+      protocol    = "TCP"
+    }
+
+    port {
+      name        = "metrics"
+      port        = 8889
+      target_port = 8889
+      protocol    = "TCP"
+    }
+
+    selector = {
+      "app.kubernetes.io/name"     = "opentelemetry-collector"
+      "app.kubernetes.io/instance" = "opentelemetry-collector"
+      "component"                  = "agent-collector"
+    }
+  }
+}
+
+# Ensure Prometheus scrape configuration is properly applied
+# This fixes the issue where Helm values don't always apply the extraScrapeConfigs correctly
+resource "null_resource" "fix_prometheus_config" {
+  count = var.install_prometheus && var.install_otel_collector ? 1 : 0
+  
+  depends_on = [
+    module.prometheus,
+    module.otel_collector,
+    kubernetes_service.opentelemetry_collector
+  ]
+
+  provisioner "local-exec" {
+    command = "chmod +x ${path.module}/fix_prometheus_config.sh && ${path.module}/fix_prometheus_config.sh"
+  }
+
+  # Trigger when dependencies change
+  triggers = {
+    prometheus_deployed     = var.install_prometheus ? "deployed" : "not_deployed"
+    otel_collector_deployed = var.install_otel_collector ? "deployed" : "not_deployed"
+  }
+}
+
 #-------------------------------------------------------------
 # Retrain model based on SQS messages
 #-------------------------------------------------------------
@@ -767,7 +896,26 @@ resource "aws_iam_role" "lambda_exec" {
         Principal = {
           Service = "lambda.amazonaws.com"
         }
-      },
+      }
+    ]
+  })
+  
+  # Add lifecycle rule to handle IAM role deletion issues
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = [
+      tags["kubernetes.io/cluster/*"]
+    ]
+  }
+}
+
+# Separate IRSA role for Kubernetes service account
+resource "aws_iam_role" "pod_reader_irsa" {
+  name = "${var.name_prefix}-pod-reader-irsa"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
       {
         Effect = "Allow"
         Action = "sts:AssumeRoleWithWebIdentity"
@@ -801,7 +949,7 @@ resource "aws_iam_policy_attachment" "lambda_basic_exec" {
 
 resource "aws_iam_policy_attachment" "cronjob_sqs_access_sa" {
   name       = "sqs-reader-access"
-  roles      = [aws_iam_role.lambda_exec.name]
+  roles      = [aws_iam_role.pod_reader_irsa.name]
   policy_arn = "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
 }
 
@@ -864,9 +1012,11 @@ resource "kubernetes_service_account" "pod_reader" {
     name      = var.service_account_name
     namespace = "airflow"
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.lambda_exec.arn
+      "eks.amazonaws.com/role-arn" = aws_iam_role.pod_reader_irsa.arn
     }
   }
+  
+  depends_on = [module.airflow]
 }
 
 
@@ -883,6 +1033,8 @@ resource "kubernetes_role" "pod_reader_role" {
     resources  = ["pods"]
     verbs      = ["list", "get", "watch"]
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Create a Role with permission to list pods
@@ -897,6 +1049,8 @@ resource "kubernetes_role" "pod_exec_role" {
     resources = ["pods/exec"]
     verbs = ["create"]
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Create a Role with permission to list pods
@@ -911,6 +1065,8 @@ resource "kubernetes_role" "pod_delete_role" {
     resources  = ["pods"]
     verbs      = ["list", "get", "watch", "delete"]
   }
+
+  depends_on = [kubernetes_namespace.api]
 }
 
 # Bind the role to the service account
@@ -932,6 +1088,8 @@ resource "kubernetes_role_binding" "pod_reader_binding" {
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Bind the role to the service account
@@ -953,6 +1111,8 @@ resource "kubernetes_role_binding" "pod_exec_binding" {
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
   }
+  
+  depends_on = [module.airflow]
 }
 
 # Bind the role to the service account
@@ -974,6 +1134,8 @@ resource "kubernetes_role_binding" "pod_delete_binding" {
     name      = kubernetes_service_account.pod_reader.metadata[0].name
     namespace = "airflow"
   }
+
+  depends_on = [kubernetes_namespace.api]
 }
 
 resource "kubernetes_cron_job_v1" "retrain_model" {
@@ -1009,6 +1171,13 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
       }
     }
   }
+  
+  depends_on = [
+    module.airflow, 
+    kubernetes_service_account.pod_reader,
+    kubernetes_role_binding.pod_reader_binding,
+    kubernetes_role_binding.pod_exec_binding
+  ]
 }
 
 #-------------------------------------------------------------
@@ -1020,6 +1189,7 @@ resource "kubernetes_cron_job_v1" "retrain_model" {
 resource "aws_ecr_repository" "my_ecr_repo" {
   name                 = "capstone/rca-anomaly-detection"  # Replace with your desired repository name
   image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow force delete of images
 
   image_scanning_configuration {
     scan_on_push = true  # Enable image scanning on push
@@ -1036,6 +1206,7 @@ resource "aws_ecr_repository" "my_ecr_repo" {
 resource "aws_ecr_repository" "trigger_ecr_repo" {
   name                 = "capstone/retrain-rca-model-trigger"  # Replace with your desired repository name
   image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow force delete of images
 
   image_scanning_configuration {
     scan_on_push = true  # Enable image scanning on push
@@ -1047,3 +1218,36 @@ resource "aws_ecr_repository" "trigger_ecr_repo" {
     Environment = "dev"
   }
 }
+
+# Create an ECR repository for Gradio UI
+resource "aws_ecr_repository" "gradio_ecr_repo" {
+  name                 = "capstone/gradio"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow force delete of images
+
+  image_scanning_configuration {
+    scan_on_push = true  # Enable image scanning on push
+  }
+
+  # Optional: Add tags
+  tags = {
+    Name = "Gradio UI Repository"
+    Environment = "dev"
+  }
+}
+
+# # Create an ECR repository
+# resource "aws_ecr_repository" "gradio_ecr_repo" {
+#   name                 = "capstone/mcp-server"  # Replace with your desired repository name
+#   image_tag_mutability = "MUTABLE"
+
+#   image_scanning_configuration {
+#     scan_on_push = true  # Enable image scanning on push
+#   }
+
+#   # Optional: Add tags
+#   tags = {
+#     Name = "Gradio UI Image Repository"
+#     Environment = "dev"
+#   }
+# }

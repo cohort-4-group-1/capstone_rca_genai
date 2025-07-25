@@ -1,6 +1,6 @@
 images:
   airflow:
-    repository: sujittah/airflow-custom
+    repository: cricet/airflow-custom
     tag: "2.10.5"
     pullPolicy: Always
 
@@ -8,7 +8,7 @@ dags:
   gitSync:
     enabled: true
     repo: https://github.com/cohort-4-group-1/capstone_rca_genai.git
-    branch: llm
+    branch: feat/observability
     subPath: "code/dags"          
     depth: 1 
 
@@ -23,7 +23,8 @@ workers:
           name: memory
           target:
             type: Utilization
-            averageUtilization: 80      
+            averageUtilization: 80  
+      - type: Resource    
         resource:
           name: cpu
           target:
@@ -38,8 +39,35 @@ workers:
 
         # Annotations to add to worker kubernetes service account.
         annotations:
-          eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-s3-access          
+          eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-s3-access
+  # Override default persistence size (default is 100GB!)
+  persistence:
+    enabled: true
+    size: 5Gi  # Reduced from 100Gi default - for worker logs/temp data
+    storageClassName: gp3
+  
+  # Simple worker environment for observability (FIXED - removed duplicate)
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-worker"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "http/protobuf"
+    - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"          
 webserver:
+  # Simple webserver environment for observability
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-webserver"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "http/protobuf"
+    - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"
+  
   serviceAccount:      
       # Specifies whether a ServiceAccount should be created
       create: true
@@ -53,8 +81,88 @@ webserver:
     type: ClusterIP
     
 scheduler:
+  # Simple scheduler environment for observability
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "airflow-scheduler"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "http/protobuf"
+    - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+      value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/metrics"
+  
   serviceAccount:
     create: true
     name: airflow-scheduler-test
     annotations:
-        eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-scheduler-s3-access  
+        eks.amazonaws.com/role-arn: arn:aws:iam::141134438799:role/iisc-capstone-rca-airflow-scheduler-s3-access
+
+# Override default persistence sizes (defaults are 100GB each!)
+triggerer:
+  persistence:
+    enabled: true
+    size: 5Gi  # Reduced from 100Gi default - for triggerer data
+    storageClassName: gp3
+
+# Redis persistence (default 1GB is reasonable)
+redis:
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClassName: gp3
+
+# Disable logs persistence to avoid ReadWriteMany access mode issues with EBS
+# Logs will be stored locally in each pod and accessible via kubectl logs
+logs:
+  persistence:
+    enabled: false
+
+# DAGs persistence not needed (using GitSync)
+
+# OpenTelemetry configuration for observability
+config:
+  webserver:
+    # Enable metrics endpoint
+    expose_config: true
+  
+  # Core Airflow configuration
+  core:
+    # Enable metrics collection
+    load_examples: false
+    enable_xcom_pickling: false
+    
+  # Metrics configuration
+  metrics:
+    # Enable statsd metrics
+    statsd_on: true
+    statsd_host: opentelemetry-collector.monitoring.svc.cluster.local
+    statsd_port: 8125
+    statsd_prefix: airflow
+
+  # Logging configuration  
+  logging:
+    # Log level
+    logging_level: INFO
+    # Enable colored logs
+    colored_console_log: true
+    # Remote logging (disabled since we use OpenTelemetry Collector)
+    remote_logging: false
+
+# Simple environment variables for OpenTelemetry
+env:
+  # Just the basic OTEL endpoint
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318"
+
+# Basic packages for OpenTelemetry
+extraPipPackages:
+  - "opentelemetry-api"
+  - "opentelemetry-sdk" 
+  - "opentelemetry-exporter-otlp"
+
+# ServiceMonitor for Prometheus metrics scraping (disabled until Prometheus Operator is installed)
+serviceMonitor:
+  enabled: false
+  labels:
+    app: airflow  

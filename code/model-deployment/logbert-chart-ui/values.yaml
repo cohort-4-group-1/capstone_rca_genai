@@ -1,5 +1,11 @@
+global:
+  region: us-east-1
+  namespace: api
+  serviceAccount:
+    name: logbert-s3-access
+
 ui:
-  image: sujitttah/logbert-ui:latest
+  image: capstone/gradio:latest
   service:
     type: ClusterIP
     port: 7860

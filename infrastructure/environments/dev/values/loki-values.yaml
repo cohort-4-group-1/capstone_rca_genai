@@ -1,0 +1,88 @@
+# Grafana Loki Values for Log Aggregation
+# Optimized for EKS environment with persistent storage
+
+deploymentMode: SingleBinary
+
+loki:
+  # Basic configuration for log aggregation
+  commonConfig:
+    replication_factor: 1
+  
+  # Authentication configuration - disable multi-tenancy for simplicity
+  auth_enabled: false
+  
+  # Storage configuration
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+  
+  # Schema configuration
+  schemaConfig:
+    configs:
+    - from: "2024-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: loki_index_
+        period: 24h
+  
+  # Limits configuration to handle Airflow logs
+  limits_config:
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    max_cache_freshness_per_query: 10m
+    split_queries_by_interval: 15m
+    per_stream_rate_limit: 512M
+    per_stream_rate_limit_burst: 1024M
+    ingestion_rate_mb: 64
+    ingestion_burst_size_mb: 128
+    max_query_series: 100000
+
+# Single binary deployment for simplicity
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: gp3
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# Gateway configuration
+gateway:
+  enabled: true
+  replicas: 1
+  
+  service:
+    type: ClusterIP
+    port: 80
+
+# Monitoring
+monitoring:
+  selfMonitoring:
+    enabled: false
+  serviceMonitor:
+    enabled: false
+    labels:
+      app: loki
+
+# Test configuration
+test:
+  enabled: false
+
+# Disable read and write components (using single binary)
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0

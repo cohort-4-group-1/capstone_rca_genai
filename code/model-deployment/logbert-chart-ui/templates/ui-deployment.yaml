@@ -15,9 +15,9 @@ spec:
       serviceAccountName: {{ .Values.global.serviceAccount.name }}
       containers:
         - name: ui
-          image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+          image: "{{ .Values.ui.image }}"
           ports:
-            - containerPort: {{ .Values.ui.image.port }}
+            - containerPort: {{ .Values.ui.service.port }}
           env:
             - name: AWS_REGION
               value: {{ .Values.global.region }}
