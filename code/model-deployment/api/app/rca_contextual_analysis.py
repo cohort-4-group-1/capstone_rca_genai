@@ -5,6 +5,48 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import json
 
 RCA_PROMPT_TEMPLATE = """
+You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies. You are given:
+
+1. An anomalous log line that was flagged by a machine learning model.
+2. A log sequence — a list of log templates leading up to the anomaly.
+3. A raw log window — actual log lines before and after the anomaly.
+
+Your job is to:
+- Identify possible causes of the anomaly.
+- Suggest where the issue might have originated.
+- Keep it concise, technical, and actionable.
+
+---
+
+Suspicious Log Line:
+"{anomaly_line}"
+
+Log Sequence (Template Pattern):
+"{log_sequence}"
+
+Raw Log Context:
+{log_window_text}
+
+---
+
+Please explain the likely root cause or contributing factors, even if speculative.
+Respond in this JSON format:
+
+{{
+For each anomaly, analyze the context and respond with a JSON object in this format:
+{
+  "anomaly_line": "...",
+  "anomaly_cause": "...",
+  "affected_component": "...",
+  "severity": "low | medium | high",
+  "suggested_action": "..."
+}}
+
+---
+
+"""
+
+RCA_BATCH_PROMPT_TEMPLATE = """
 You are a cloud infrastructure expert skilled in analyzing OpenStack logs and finding root causes of anomalies.
 
 You are given a list of anomalies, where each anomaly includes:
@@ -52,7 +94,7 @@ def contextual_analysis_batch(anomaly_inputs):
 
     prompt_header = RCA_PROMPT_TEMPLATE.split("{anomaly_list}")[0].strip()
     base_tokens = len(tokenizer.encode(prompt_header))
-    
+
     formatted_blocks = []
     total_tokens = base_tokens
     print(f"base_tokens: {base_tokens}")
