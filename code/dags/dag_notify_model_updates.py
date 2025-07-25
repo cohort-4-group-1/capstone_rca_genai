@@ -3,26 +3,30 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime
 import boto3
 import json
+from otel import tracer, meter, logger
 
 def send_to_sqs(**context):
-    # SQS setup
-    sqs = boto3.client('sqs', region_name='us-east-1')  # Set your region
-    queue_url = 'https://sqs.us-east-1.amazonaws.com/141134438799/rca-queue'  # Replace with your queue URL
+    with tracer.start_as_current_span("send_to_sqs") as span:
+        span.set_attribute("function", "send_to_sqs")
+        logger.info("Sending message to SQS queue")
+        # SQS setup
+        sqs = boto3.client('sqs', region_name='us-east-1')  # Set your region
+        queue_url = 'https://sqs.us-east-1.amazonaws.com/141134438799/rca-queue'  # Replace with your queue URL
 
-    # Optional: pass dynamic values using context or config
-    message_body = {
-        'task': 'airflow_trigger',
-        'timestamp': str(datetime.utcnow()),
-        'extra': context.get('dag_run').conf if context.get('dag_run') else {},
-        'message': 'model_updated'
-    }
+        # Optional: pass dynamic values using context or config
+        message_body = {
+            'task': 'airflow_trigger',
+            'timestamp': str(datetime.utcnow()),
+            'extra': context.get('dag_run').conf if context.get('dag_run') else {},
+            'message': 'model_updated'
+        }
 
-    # Send message
-    response = sqs.send_message(
-        QueueUrl=queue_url,
-        MessageBody=json.dumps(message_body)
-    )
-    print(f"Message sent: {response['MessageId']}")
+        # Send message
+        response = sqs.send_message(
+            QueueUrl=queue_url,
+            MessageBody=json.dumps(message_body)
+        )
+        logger.info(f"Message sent: {response['MessageId']}")
 
 # Define the DAG
 with DAG(

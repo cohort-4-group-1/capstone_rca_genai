@@ -2,69 +2,10 @@
 from airflow import DAG
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from datetime import datetime
-import logging
-import os
+from opentelemetry import tracer, meter, logger, OTEL_ENABLED
 
 # Simple OpenTelemetry setup (optional - graceful fallback if not available)
 try:
-    from opentelemetry import trace, metrics
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-    from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
-    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-    from opentelemetry.sdk.resources import Resource
-    
-    # Simple OTEL setup
-    resource = Resource.create({
-        "service.name": "airflow-worker",
-        "dag.id": "dag_log_rca_orchestrator"
-    })
-    
-    # Configure tracing
-    trace_provider = TracerProvider(resource=resource)
-    trace_provider.add_span_processor(BatchSpanProcessor(
-        OTLPSpanExporter(endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", 
-                        "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/traces")
-    ))
-    trace.set_tracer_provider(trace_provider)
-    
-    # Configure metrics - use the specific endpoint if available
-    metrics_endpoint = os.getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", 
-                                os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", 
-                                        "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/metrics")
-    
-    metrics_provider = MeterProvider(
-        resource=resource, 
-        metric_readers=[
-            PeriodicExportingMetricReader(
-                OTLPMetricExporter(
-                    endpoint=metrics_endpoint,
-                    headers={}
-                ),
-                export_interval_millis=5000  # Export every 5 seconds
-            )
-        ]
-    )
-    metrics.set_meter_provider(metrics_provider)
-    
-    # Configure logging
-    logger_provider = LoggerProvider(resource=resource)
-    logger_provider.add_log_record_processor(BatchLogRecordProcessor(
-        OTLPLogExporter(
-            endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT",
-                             "http://opentelemetry-collector.monitoring.svc.cluster.local:4318") + "/v1/logs",
-            timeout=30
-        )
-    ))
-    
-    # Get tracer and meter
-    tracer = trace.get_tracer(__name__)
-    meter = metrics.get_meter(__name__)
     
     # =============================================================================
     # WORKING METRICS (VISIBLE IN GRAFANA)
@@ -109,21 +50,13 @@ except ImportError as e:
     meter = None
     print(f"[DAG_ORCHESTRATOR] OpenTelemetry not available: {e}")
 
-# Simple logging setup
-logger = logging.getLogger(__name__)
 
 # Configure logger with OTEL handler if available
 if OTEL_ENABLED:
     try:
-        otel_handler = LoggingHandler(logger_provider=logger_provider)
-        logger.handlers.clear()
-        logger.addHandler(otel_handler)
-        logger.propagate = False
-        logger.setLevel(logging.INFO)
-        
         logger.info("[DAG_ORCHESTRATOR] OTEL logging configured")
     except Exception as e:
-        print(f"[ERROR] OTEL logging setup failed: {e}")
+        logger.error(f"[DAG_ORCHESTRATOR] OTEL logging setup failed: {e}")
 else:
     logger.info("[DAG_ORCHESTRATOR] Standard logging")
 

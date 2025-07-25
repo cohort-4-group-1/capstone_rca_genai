@@ -1,7 +1,7 @@
 images:
   airflow:
     repository: cricet/airflow-custom
-    tag: "2.10.5"
+    tag: "2.10.6"
     pullPolicy: Always
 
 dags:

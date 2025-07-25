@@ -6,47 +6,48 @@ import pandas as pd
 import boto3
 import re
 import configuration  
+from otel import tracer, meter, logger, OTEL_ENABLED
 
 def convert_raw_log_to_csv(**kwargs):
-    print(f"Reading file from S3: {configuration.SOURCE_BUCKET}/{configuration.RAW_FILE_KEY}")
-    s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
-    obj = s3.get_object(Bucket=configuration.SOURCE_BUCKET, Key=configuration.RAW_FILE_KEY)
-    
-    raw_log = obj['Body'].read().decode('utf-8')
-    print("Successfully read log file from S3")   
-    
-    pattern = re.compile(
-        r'(?P<source>[^\s]+)\s+'
-        r'(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\s+'
-        r'(?P<pid>\d+)\s+'
-        r'(?P<level>[A-Z]+)\s+'
-        r'(?P<component>[^\[]+)\s*'
-        r'(?:\[(?P<request_id>[^\]]+)\])?\s*'
-        r'(?P<message>.*)'
-    )
+    with tracer.start_as_current_span("convert_raw_log_to_csv") as span:
+        span.set_attribute("function", "convert_raw_log_to_csv")
+        logger.info(f"[LOG_PARSE] Reading file from S3: {configuration.SOURCE_BUCKET}/{configuration.RAW_FILE_KEY}")
+        s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
+        obj = s3.get_object(Bucket=configuration.SOURCE_BUCKET, Key=configuration.RAW_FILE_KEY)
+        raw_log = obj['Body'].read().decode('utf-8')
+        logger.info("[LOG_PARSE] Successfully read log file from S3")
+        pattern = re.compile(
+            r'(?P<source>[^\s]+)\s+'
+            r'(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\s+'
+            r'(?P<pid>\d+)\s+'
+            r'(?P<level>[A-Z]+)\s+'
+            r'(?P<component>[^\[]+)\s*'
+            r'(?:\[(?P<request_id>[^\]]+)\])?\s*'
+            r'(?P<message>.*)'
+        )
+        rows = []
+        for line in raw_log.splitlines():
+            match = pattern.match(line)
+            if match:
+                rows.append(match.groupdict())
+        df = pd.DataFrame(rows)
+        csv_buffer = StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_string = csv_buffer.getvalue()
+        logger.info(f"[LOG_PARSE] CSV conversion complete. Parsed {len(df)} rows.")
+        upload_csv_to_silver_datalake(csv_string)
 
-    rows = []
-    for line in raw_log.splitlines():
-        match = pattern.match(line)
-        if match:
-            rows.append(match.groupdict())
-
-    df = pd.DataFrame(rows)
-    
-    csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_string = csv_buffer.getvalue()
-    print("CSV conversion complete.")
-    upload_csv_to_silver_datalake(csv_string)
-
-def upload_csv_to_silver_datalake(csv_data):    
-    s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
-    s3.put_object(
-        Bucket=configuration.DEST_BUCKET,
-        Key=configuration.SILVER_FILE_KEY,
-        Body=csv_data.encode('utf-8')
-    )
-    print(f"CSV uploaded to S3: {configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}")
+def upload_csv_to_silver_datalake(csv_data): 
+    with tracer.start_as_current_span("upload_csv_to_silver_datalake") as span:
+        span.set_attribute("function", "upload_csv_to_silver_datalake")
+        logger.info(f"[LOG_PARSE] Uploading CSV to S3: {configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}")  
+        s3 = boto3.client('s3', region_name=configuration.AWS_REGION)
+        s3.put_object(
+            Bucket=configuration.DEST_BUCKET,
+            Key=configuration.SILVER_FILE_KEY,
+            Body=csv_data.encode('utf-8')
+        )
+        logger.info(f"CSV uploaded to S3: {configuration.DEST_BUCKET}/{configuration.SILVER_FILE_KEY}")
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
 now_utc = datetime.now(timezone.utc)

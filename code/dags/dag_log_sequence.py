@@ -5,29 +5,33 @@ import configuration
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta, timezone
+from otel import tracer, meter, logger
 
 def generate_log_sequence():
-    s3 = boto3.client('s3')
-    structured_key = configuration.STRUCTURED_WITH_LOG_KEY
-    bucket = configuration.DEST_BUCKET
+    with tracer.start_as_current_span("generate_log_sequence") as span:
+        span.set_attribute("function", "generate_log_sequence")
+        logger.info("[LOG_SEQUENCE] Generating log sequence for LogBERT input")
+        s3 = boto3.client('s3')
+        structured_key = configuration.STRUCTURED_WITH_LOG_KEY
+        bucket = configuration.DEST_BUCKET
 
-    response = s3.get_object(Bucket=bucket, Key=structured_key)
-    df = pd.read_csv(response['Body'])
+        response = s3.get_object(Bucket=bucket, Key=structured_key)
+        df = pd.read_csv(response['Body'])
 
-    template_key = configuration.TEMPLATE_FILE_KEY
-    response = s3.get_object(Bucket=bucket, Key=template_key)
-    template_df = pd.read_csv(response['Body'])
-    logkey_to_template = dict(zip(template_df['LogKey'], template_df['Template']))
-    
-    df["template_text"] = df["LogKey"].map(logkey_to_template)
-    
-    session_df = df.groupby("request_id")["template_text"].apply(lambda x: " ".join(x)).reset_index()
-    session_df.columns = ["session_id", "sequence"]
+        template_key = configuration.TEMPLATE_FILE_KEY
+        response = s3.get_object(Bucket=bucket, Key=template_key)
+        template_df = pd.read_csv(response['Body'])
+        logkey_to_template = dict(zip(template_df['LogKey'], template_df['Template']))
+        
+        df["template_text"] = df["LogKey"].map(logkey_to_template)
+        
+        session_df = df.groupby("request_id")["template_text"].apply(lambda x: " ".join(x)).reset_index()
+        session_df.columns = ["session_id", "sequence"]
 
-    csv_buffer = StringIO()
-    session_df.to_csv(csv_buffer, index=False)
-    s3.put_object(Bucket=bucket, Key=configuration.LOG_SEQUENCE__FILE_KEY, Body=csv_buffer.getvalue())
-    print("✅ LogBERT input saved to S3: gold/logbert_template_text_input.csv")
+        csv_buffer = StringIO()
+        session_df.to_csv(csv_buffer, index=False)
+        s3.put_object(Bucket=bucket, Key=configuration.LOG_SEQUENCE__FILE_KEY, Body=csv_buffer.getvalue())
+        logger.info("[LOG_SEQUENCE] ✅ LogBERT input saved to S3: gold/logbert_template_text_input.csv")
 
 # DAG Start Time (rounded down to nearest 30 mins minus 5 mins)
 now_utc = datetime.now(timezone.utc)
