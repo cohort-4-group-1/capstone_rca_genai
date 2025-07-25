@@ -61,6 +61,13 @@ def train_isolation_forest():
         model.fit(X)
         scores = -model.decision_function(X)
         avg_score = float(np.mean(scores))
+        std_score = float(np.std(scores))
+        iqr_score = float(np.percentile(scores, 75) - np.percentile(scores, 25))
+
+        preds = model.predict(X)
+        anomaly_count = int((preds == -1).sum())
+        normal_count = int((preds == 1).sum())
+        anomaly_ratio = anomaly_count / len(preds)
 
         with mlflow.start_run(nested=True):
             mlflow.log_params({
@@ -68,13 +75,22 @@ def train_isolation_forest():
                 "contamination": contamination,
                 "max_samples": max_samples
             })
-            mlflow.log_metric("avg_anomaly_score", avg_score)
-
+           mlflow.log_metrics({
+                "avg_anomaly_score": avg_score,
+                "std_anomaly_score": std_score,
+                "iqr_anomaly_score": iqr_score,
+                "anomaly_ratio": anomaly_ratio,
+                "n_anomalies": anomaly_count,
+                "n_normals": normal_count
+            })
         return avg_score
 
     study = optuna.create_study(direction="maximize")
     with mlflow.start_run():
         study.optimize(objective, n_trials=N_TRIALS)
+        best_params = study.best_params
+        mlflow.log_params(best_params)
+        mlflow.log_metric("best_avg_anomaly_score", study.best_value)
 
     best_params = study.best_params
     iforest = IsolationForest(
