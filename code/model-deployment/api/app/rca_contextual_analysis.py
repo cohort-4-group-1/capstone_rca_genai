@@ -1,5 +1,3 @@
-# rca_contextual_analysis.py
-
 from langchain_core.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_community.llms import HuggingFacePipeline
@@ -39,8 +37,6 @@ For each anomaly, respond in this JSON list format:
 ]
 """
 
-
-
 # Load model once
 model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -51,14 +47,30 @@ llm = HuggingFacePipeline(pipeline=hf_pipeline)
 prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 chain = prompt | llm
 
+MAX_TOKENS = 2048
+
 def contextual_analysis_batch(anomaly_inputs):
-    # Construct a formatted block of anomalies
-    formatted_input = "\n\n".join([
-        f"🔴 Anomaly Line:\n{a['anomaly_line']}\n"
-        f"🧩 Log Sequence:\n{a.get('log_sequence', '')}\n"
-        f"📜 Log Window:\n{a['log_window_text']}"
-        for a in anomaly_inputs
-    ])
+    prompt_header = RCA_PROMPT_TEMPLATE.split("{anomaly_list}")[0].strip()
+    base_tokens = len(tokenizer.encode(prompt_header))
+
+    formatted_blocks = []
+    total_tokens = base_tokens
+
+    for anomaly in anomaly_inputs:
+        block = (
+            f"🔴 Anomaly Line:\n{anomaly['anomaly_line']}\n"
+            f"🧩 Log Sequence:\n{anomaly.get('log_sequence', '')}\n"
+            f"📜 Log Window:\n{anomaly['log_window_text']}"
+        )
+        block_tokens = len(tokenizer.encode(block))
+
+        if total_tokens + block_tokens > MAX_TOKENS:
+            break
+
+        formatted_blocks.append(block)
+        total_tokens += block_tokens
+
+    formatted_input = "\n\n".join(formatted_blocks)
 
     response = chain.invoke({"anomaly_list": formatted_input})
 
