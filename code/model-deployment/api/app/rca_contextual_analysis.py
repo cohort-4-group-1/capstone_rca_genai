@@ -33,17 +33,14 @@ Please explain the likely root cause or contributing factors, even if speculativ
 Respond in this JSON format:
 
 {{
-For each anomaly, analyze the context and respond with a JSON object in this format:
-{
   "anomaly_line": "...",
   "anomaly_cause": "...",
   "affected_component": "...",
   "severity": "low | medium | high",
   "suggested_action": "..."
-}
+}}
 
 ---
-
 """
 
 # Load model once
@@ -57,7 +54,6 @@ prompt = PromptTemplate.from_template(RCA_PROMPT_TEMPLATE)
 chain = prompt | llm
 
 MAX_TOKENS = 2048
-
 
 def truncate_input_to_token_limit(prompt_template: str, anomaly_line: str, log_sequence: str, log_window_text: str, tokenizer, max_tokens: int = 2048):
     formatted_prompt = prompt_template.format(
@@ -75,12 +71,11 @@ def truncate_input_to_token_limit(prompt_template: str, anomaly_line: str, log_s
         log_sequence=log_sequence,
         log_window_text=trimmed_log_window
     ))) > max_tokens:
-        trimmed_log_window = trimmed_log_window[len(trimmed_log_window)//10:]  # trim ~10% each loop
+        trimmed_log_window = trimmed_log_window[len(trimmed_log_window)//10:]
         if len(trimmed_log_window) < 100:
             break
 
     return anomaly_line, log_sequence, trimmed_log_window
-
 
 def contextual_analysis(anomaly_line: str, log_sequence: str, log_window_text: str) -> dict:
     anomaly_line, log_sequence, log_window_text = truncate_input_to_token_limit(
